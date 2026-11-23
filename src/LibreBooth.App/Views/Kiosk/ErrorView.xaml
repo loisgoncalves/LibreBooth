@@ -1,0 +1,16 @@
+<UserControl x:Class="LibreBooth.App.Views.Kiosk.ErrorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="1500">
+            <TextBlock Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" FontSize="150" Foreground="{DynamicResource AccentBrush}"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="Oups !" Style="{StaticResource KioskTitle}" FontSize="110" Margin="0,24,0,0" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding Message}" FontSize="44" TextWrapping="Wrap" TextAlignment="Center" Margin="0,18,0,0" HorizontalAlignment="Center" />
+            <TextBlock FontSize="30" Foreground="{DynamicResource MutedTextBrush}" Margin="0,30,0,0" HorizontalAlignment="Center">
+                <Run Text="Retour à l'accueil dans " /><Run Text="{Binding SecondsLeft, Mode=OneWay}" /><Run Text=" s" />
+            </TextBlock>
+            <Button Style="{StaticResource PrimaryButton}" Content="Recommencer" Command="{Binding RetryCommand}" Margin="0,44,0,0" HorizontalAlignment="Center" MinWidth="460" />
+        </StackPanel>
+    </Grid>
+</UserControl>

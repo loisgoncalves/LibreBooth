@@ -1,0 +1,47 @@
+﻿<Window x:Class="LibreBooth.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="LibreBooth"
+        Background="{DynamicResource BackgroundBrush}"
+        Foreground="{DynamicResource ForegroundBrush}"
+        FontFamily="{StaticResource KioskFont}"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        WindowState="Maximized"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        Stylus.IsPressAndHoldEnabled="False">
+    <Grid>
+        <!-- Écrans dessinés en 1920 × 1080 puis mis à l'échelle de l'écran du booth -->
+        <Viewbox Stretch="Uniform">
+            <Grid Width="1920" Height="1080" ClipToBounds="True">
+                <ContentControl Content="{Binding CurrentScreen}" Focusable="False" />
+            </Grid>
+        </Viewbox>
+
+        <!-- Coin secret : appui long de 3 secondes en haut à droite pour ouvrir l'admin (code PIN) -->
+        <Border x:Name="AdminCorner" Width="140" Height="140" HorizontalAlignment="Right" VerticalAlignment="Top" Background="Transparent" />
+
+        <!-- Bouton visible sur l'accueil : revenir à l'admin ou quitter LibreBooth (code PIN) -->
+        <Button x:Name="LeaveButton" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,18"
+                Width="58" Height="58" Focusable="False" Cursor="Hand" ToolTip="Revenir à l'admin ou quitter LibreBooth (code PIN)"
+                Visibility="{Binding IsIdle, Converter={StaticResource BoolToVisibility}}" Click="LeaveButton_Click">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="Bd" CornerRadius="29" Background="#66000000" BorderBrush="#55FFFFFF" BorderThickness="1" Opacity="0.75">
+                        <TextBlock Text="&#xE7E8;" FontFamily="{StaticResource IconFont}" FontSize="24" Foreground="White"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Opacity" Value="1" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="#AA000000" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
+    </Grid>
+</Window>

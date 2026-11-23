@@ -1,0 +1,169 @@
+<Window x:Class="LibreBooth.App.Admin.TemplateEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="LibreBooth – Éditeur de modèle"
+        Width="1440" Height="920"
+        WindowStartupLocation="CenterOwner"
+        WindowState="Maximized"
+        Topmost="True"
+        ShowInTaskbar="False">
+    <Window.Resources>
+        <ControlTemplate x:Key="MoveThumbTemplate" TargetType="Thumb">
+            <Border Background="Transparent" />
+        </ControlTemplate>
+        <ControlTemplate x:Key="ResizeThumbTemplate" TargetType="Thumb">
+            <Border Background="#FFFF9800" CornerRadius="4" BorderBrush="White" BorderThickness="2" />
+        </ControlTemplate>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="Margin" Value="0,3,6,3" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="3" />
+            <Setter Property="Margin" Value="0,2,6,4" />
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,6,0,1" />
+            <Setter Property="Foreground" Value="#333" />
+        </Style>
+        <Style x:Key="SectionTitle" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,14,0,4" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="17" />
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="RootGrid" Background="White" Margin="0" TextElement.FontSize="15" TextElement.FontFamily="Segoe UI">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="440" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Plan de travail : le cadre et les zones photo (déplaçables et redimensionnables) -->
+        <Border Background="#2B2B30" Margin="12" CornerRadius="8" Padding="16">
+            <Viewbox Stretch="Uniform">
+                <Grid x:Name="CanvasHost">
+                    <Rectangle x:Name="BackgroundRect" />
+                    <Image x:Name="FrameImage" Stretch="Fill" />
+                    <Canvas x:Name="ZonesCanvas" Background="Transparent" />
+                </Grid>
+            </Viewbox>
+        </Border>
+
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="4,12,16,12">
+                <TextBlock x:Name="InfoText" Foreground="#0B5" TextWrapping="Wrap" FontWeight="SemiBold" />
+
+                <TextBlock Text="Nom du modèle" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="NameBox" />
+                <TextBlock x:Name="SizeText" Foreground="#555" TextWrapping="Wrap" />
+                <CheckBox x:Name="StripCheck" Content="Bandelette 5x15 : placée deux fois sur le 10x15" Margin="0,6" Click="Options_Changed" />
+                <CheckBox x:Name="BwCheck" Content="Photos en noir et blanc" Margin="0,2" />
+                <TextBlock Text="Profil d'impression (réglages du pilote)" Style="{StaticResource FieldLabel}" />
+                <ComboBox x:Name="ProfileCombo" IsEditable="True" Margin="0,2,6,4" />
+                <StackPanel x:Name="FrameOptions">
+                    <TextBlock Text="Couleur de fond sous les photos (#RRVVBB)" Style="{StaticResource FieldLabel}" />
+                    <TextBox x:Name="BackgroundColorBox" Width="140" HorizontalAlignment="Left" LostFocus="BackgroundColor_LostFocus" />
+                    <Button Content="Changer le cadre PNG…" HorizontalAlignment="Left" Click="ChangeFrame_Click" />
+                </StackPanel>
+
+                <TextBlock Text="Zones photo (ordre = ordre des prises de vue)" Style="{StaticResource SectionTitle}" />
+                <ListBox x:Name="ZonesList" Height="130" SelectionChanged="ZonesList_SelectionChanged" />
+                <WrapPanel>
+                    <Button x:Name="DetectZonesButton" Content="Détecter les zones transparentes" Click="DetectZones_Click" />
+                    <Button Content="Ajouter" Click="AddZone_Click" />
+                    <Button Content="Supprimer" Click="RemoveZone_Click" />
+                    <Button Content="Ranger dans l'ordre de lecture" Click="SortZones_Click" />
+                </WrapPanel>
+                <Grid Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="X" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="ZoneXBox" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Y" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="ZoneYBox" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Largeur" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="ZoneWBox" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="Hauteur" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="ZoneHBox" />
+                    </StackPanel>
+                </Grid>
+                <Button Content="Appliquer à la zone" HorizontalAlignment="Left" Click="ApplyZone_Click" />
+
+                <StackPanel x:Name="TextsSection">
+                <TextBlock Text="Textes ({evenement} et {date} sont remplacés)" Style="{StaticResource SectionTitle}" />
+                <ListBox x:Name="TextsList" Height="90" SelectionChanged="TextsList_SelectionChanged" />
+                <WrapPanel>
+                    <Button Content="Ajouter un texte" Click="AddText_Click" />
+                    <Button Content="Supprimer" Click="RemoveText_Click" />
+                </WrapPanel>
+                <TextBlock Text="Contenu" Style="{StaticResource FieldLabel}" />
+                <TextBox x:Name="TextContentBox" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="X" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="TextXBox" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Y (ligne de base)" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="TextYBox" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Taille" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="TextSizeBox" />
+                    </StackPanel>
+                </Grid>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                        <ColumnDefinition />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Couleur" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="TextColorBox" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Police" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="TextFontBox" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Alignement" Style="{StaticResource FieldLabel}" />
+                        <ComboBox x:Name="TextAlignCombo" Margin="0,2,6,4" />
+                    </StackPanel>
+                </Grid>
+                <WrapPanel>
+                    <CheckBox x:Name="TextBoldCheck" Content="Gras" Margin="0,4,16,4" />
+                    <CheckBox x:Name="TextItalicCheck" Content="Italique" Margin="0,4,16,4" />
+                </WrapPanel>
+                <Button Content="Appliquer au texte" HorizontalAlignment="Left" Click="ApplyText_Click" />
+                </StackPanel>
+
+                <Border BorderBrush="#DDD" BorderThickness="0,1,0,0" Margin="0,16,0,0" Padding="0,12,0,0">
+                    <WrapPanel>
+                        <Button Content="Aperçu" Click="Preview_Click" />
+                        <Button Content="Enregistrer" FontWeight="SemiBold" Click="Save_Click" />
+                        <Button Content="Annuler" Click="Cancel_Click" />
+                    </WrapPanel>
+                </Border>
+                <TextBlock x:Name="StatusText" Foreground="#555" TextWrapping="Wrap" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

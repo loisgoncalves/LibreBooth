@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------- Compilation
+bin/
+obj/
+.vs/
+*.user
+TestResults/
+
+# ---------------------------------------------------------------- Versions fabriquées
+# Installateurs et zips (dont la version privée qui contient les pilotes des fabricants) : publiés à part, dans
+# les « Releases » de GitHub, et seulement dans leur version publique (publish\github).
+publish/
+
+# ---------------------------------------------------------------- Fichiers des fabricants : jamais publiés
+# SDK Canon (EDSDK.dll, EdsImage.dll), API d'état DNP (cspstat.dll) et pilote Windows de la DS620.
+drivers/**/*.dll
+drivers/**/*.DLL
+Win_11_DP-DS620_Driver-*/
+*.inf
+*.cat
+dpinst*.exe
+
+# ---------------------------------------------------------------- Fichiers personnels ou locaux
+notes-personnelles.md
+docs/captures/
+assets/logo-source.jpg
+*.log
+*.prn
+.env
+*.pfx
+*.snk

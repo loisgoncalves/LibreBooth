@@ -1,0 +1,40 @@
+﻿<Application x:Class="LibreBooth.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:kiosk="clr-namespace:LibreBooth.App.Kiosk"
+             xmlns:views="clr-namespace:LibreBooth.App.Views.Kiosk"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/KioskStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Chaque écran du parcours invité et sa vue -->
+            <DataTemplate DataType="{x:Type kiosk:AttractViewModel}">
+                <views:AttractView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type kiosk:ChooseTemplateViewModel}">
+                <views:ChooseTemplateView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type kiosk:ShootingViewModel}">
+                <views:ShootingView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type kiosk:ProcessingViewModel}">
+                <views:ProcessingView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type kiosk:ReviewViewModel}">
+                <views:ReviewView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type kiosk:EmailViewModel}">
+                <views:EmailView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type kiosk:ThanksViewModel}">
+                <views:ThanksView />
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type kiosk:ErrorViewModel}">
+                <views:ErrorView />
+            </DataTemplate>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Programme d'installation de LibreBooth. Il vise .NET Framework 4.8, présent d'office dans Windows 10 et 11 :
+    rien d'autre à installer avant de le lancer. Le contenu à installer (LibreBooth et le pilote DNP) est ajouté
+    à la fin de l'exécutable par installer\fabriquer-installation.ps1.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>LibreBooth-Installation</AssemblyName>
+    <RootNamespace>LibreBooth.Installer</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <Product>LibreBooth</Product>
+    <Description>Installation de LibreBooth</Description>
+    <Authors>Loïs Gonçalves</Authors>
+    <Company>Loïs Gonçalves</Company>
+    <Copyright>© 2026 Loïs Gonçalves</Copyright>
+    <Version>1.5.0</Version>
+    <ApplicationIcon>..\..\assets\LibreBooth.ico</ApplicationIcon>
+    <SatelliteResourceLanguages>fr</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Logo affiché en haut de la fenêtre d'installation -->
+    <EmbeddedResource Include="..\..\assets\logo-librebooth.png" LogicalName="LibreBooth.Installer.logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="Microsoft.CSharp" />
+  </ItemGroup>
+
+</Project>

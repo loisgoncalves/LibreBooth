@@ -1,0 +1,16 @@
+<UserControl x:Class="LibreBooth.App.Views.Kiosk.ThanksView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border Width="200" Height="200" CornerRadius="100" Background="{DynamicResource AccentBrush}" HorizontalAlignment="Center">
+                <TextBlock Text="&#xE73E;" FontFamily="{StaticResource IconFont}" FontSize="100"
+                           Foreground="{DynamicResource AccentForegroundBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock Text="{Binding Title}" Style="{StaticResource KioskTitle}" FontSize="140" Margin="0,48,0,0" HorizontalAlignment="Center" />
+            <TextBlock Text="{Binding Message}" FontSize="44" Foreground="{DynamicResource MutedTextBrush}" Margin="0,12,0,0"
+                       HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="1500"
+                       Visibility="{Binding Message, Converter={StaticResource NullToCollapsed}}" />
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -1,0 +1,604 @@
+<Window x:Class="LibreBooth.App.Admin.AdminWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:admin="clr-namespace:LibreBooth.App.Admin"
+        Title="LibreBooth – Administration"
+        Width="1320" Height="900" MinWidth="980" MinHeight="620"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,16" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="14,6" />
+            <Setter Property="Margin" Value="0,4,8,4" />
+            <Setter Property="MinHeight" Value="36" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="Margin" Value="0,2,0,8" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style TargetType="PasswordBox">
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="Margin" Value="0,2,0,8" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,6" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="RadioButton">
+            <Setter Property="Margin" Value="0,4,24,4" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Margin" Value="0,2,0,8" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style TargetType="DatePicker">
+            <Setter Property="Margin" Value="0,2,0,8" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,6,0,2" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="#333" />
+        </Style>
+        <Style x:Key="Help" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#666" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Margin" Value="0,4,0,8" />
+        </Style>
+        <Style x:Key="Value" TargetType="TextBlock">
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,4" />
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="RootGrid" Background="White" TextElement.FontSize="16" TextElement.FontFamily="Segoe UI">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- En-tête : le logo, et comment passer de l'admin au photobooth -->
+        <Border Background="#F4F8F5" BorderBrush="#D5E6DA" BorderThickness="0,0,0,1" Padding="16,8">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Margin="0,0,24,0" VerticalAlignment="Center">
+                    <Image Source="pack://application:,,,/Resources/icone-librebooth.png" Height="44" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="LibreBooth" FontSize="22" FontWeight="Bold" Foreground="#141414" />
+                        <TextBlock x:Name="HeaderVersionText" Text="Administration" FontSize="13" Foreground="#666" />
+                    </StackPanel>
+                </StackPanel>
+                <TextBlock TextWrapping="Wrap" FontSize="15" Foreground="#1D4D2E" VerticalAlignment="Center">
+                    <Run Text="Préparez l'événement dans les onglets, puis cliquez sur « Démarrer le photobooth »." FontWeight="SemiBold" />
+                    <Run Text="Pendant l'événement, pour revenir ici ou quitter : bouton rond en bas à droite de l'accueil du photobooth (ou appui long de 3 secondes en haut à droite), puis le code PIN." />
+                </TextBlock>
+            </DockPanel>
+        </Border>
+
+        <TabControl x:Name="AdminTabs" Grid.Row="1" Margin="8" Padding="0">
+
+            <!-- ================================================================ Événement -->
+            <TabItem Header="Événement" Padding="16,8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16" MaxWidth="1150" HorizontalAlignment="Left">
+                        <GroupBox Header="Événement en cours">
+                            <StackPanel>
+                                <TextBlock x:Name="EventNameText" FontSize="24" FontWeight="Bold" />
+                                <TextBlock x:Name="EventDateText" Style="{StaticResource Value}" />
+                                <TextBlock x:Name="StatsText" Style="{StaticResource Value}" Foreground="#0B5" />
+                                <TextBlock x:Name="EventFolderText" Style="{StaticResource Help}" />
+                                <WrapPanel>
+                                    <Button Content="Ouvrir le dossier de l'événement" Click="OpenEventFolder_Click" />
+                                </WrapPanel>
+                                <TextBlock Text="Renommer l'événement (le texte {evenement} des modèles change aussi)" Style="{StaticResource FieldLabel}" />
+                                <WrapPanel>
+                                    <TextBox x:Name="RenameNameBox" Width="420" Margin="0,2,8,8" />
+                                    <DatePicker x:Name="RenameDatePicker" Width="160" Margin="0,2,8,8" />
+                                    <Button Content="Enregistrer" Click="RenameEvent_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Nouvel événement">
+                            <StackPanel>
+                                <TextBlock Text="Chaque événement a son propre dossier de photos et ses propres statistiques." Style="{StaticResource Help}" />
+                                <WrapPanel>
+                                    <TextBox x:Name="NewEventNameBox" Width="420" Margin="0,2,8,8" />
+                                    <DatePicker x:Name="NewEventDatePicker" Width="160" Margin="0,2,8,8" />
+                                    <Button Content="Créer et activer" Click="CreateEvent_Click" />
+                                </WrapPanel>
+                                <TextBlock Text="Ou reprendre un événement existant :" Style="{StaticResource FieldLabel}" />
+                                <WrapPanel>
+                                    <ComboBox x:Name="EventsCombo" Width="420" Margin="0,2,8,8" />
+                                    <Button Content="Activer" Click="ActivateEvent_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Galerie (dernières sessions)">
+                            <StackPanel>
+                                <ListBox x:Name="GalleryList" Height="380" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ListBox.ItemsPanel>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <StackPanel Width="230" Margin="4">
+                                                <Image Source="{Binding Thumbnail}" Height="150" Stretch="Uniform" />
+                                                <TextBlock Text="{Binding Label}" FontWeight="Normal" FontSize="13" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button Content="Actualiser" Click="RefreshGallery_Click" />
+                                    <Button Content="Réimprimer la photo choisie" Click="Reprint_Click" />
+                                    <TextBox x:Name="ResendAddressBox" Width="300" Margin="16,4,8,4" VerticalContentAlignment="Center" />
+                                    <Button Content="Envoyer par e-mail" Click="ResendEmail_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="GalleryStatusText" Style="{StaticResource Help}" />
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================================================================ Personnalisation -->
+            <TabItem Header="Personnalisation" Padding="16,8">
+                <admin:CustomizationPanel x:Name="CustomizationTab" />
+            </TabItem>
+
+            <!-- ================================================================ Appareil photo -->
+            <TabItem Header="Appareil photo" Padding="16,8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16" MaxWidth="1150" HorizontalAlignment="Left">
+                        <GroupBox Header="Appareil utilisé">
+                            <StackPanel>
+                                <WrapPanel>
+                                    <RadioButton x:Name="CanonRadio" Content="Canon EOS (SDK Canon EDSDK)" GroupName="CameraKind" Checked="CameraKind_Changed" />
+                                    <RadioButton x:Name="DemoRadio" Content="Appareil de démonstration" GroupName="CameraKind" Checked="CameraKind_Changed" />
+                                </WrapPanel>
+                                <TextBlock x:Name="CameraModeHelp" Style="{StaticResource Help}" />
+                                <TextBlock x:Name="CameraStatusText" Style="{StaticResource Value}" FontWeight="SemiBold" />
+                                <TextBlock x:Name="BatteryText" Style="{StaticResource Value}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Essai">
+                            <StackPanel>
+                                <WrapPanel>
+                                    <Button x:Name="LiveTestButton" Content="Démarrer le live view" Click="LiveTest_Click" />
+                                    <Button x:Name="TestPhotoButton" Content="Prendre une photo de test" Click="TestPhoto_Click" />
+                                </WrapPanel>
+                                <Border Background="#222" Height="380" Margin="0,8,0,0">
+                                    <Image x:Name="CameraPreview" Stretch="Uniform" />
+                                </Border>
+                                <TextBlock x:Name="CameraTestStatus" Style="{StaticResource Help}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Réglages">
+                            <StackPanel>
+                                <CheckBox Content="Live view en miroir (conseillé : les invités se voient comme dans un miroir)" IsChecked="{Binding Camera.MirrorLiveView}" />
+                                <CheckBox Content="Photos finales en miroir (déconseillé : les textes seraient à l'envers)" IsChecked="{Binding Camera.MirrorPhotos}" />
+                                <CheckBox Content="Autofocus avant chaque photo (déconseillé : la mise au point manuelle est plus fiable)" IsChecked="{Binding Camera.UseAutofocus}" />
+                                <CheckBox Content="Enregistrer aussi chaque photo sur la carte SD de l'appareil (copie de secours)" IsChecked="{Binding Camera.SaveToCardToo}" />
+                                <TextBlock Text="Rotation de l'appareil sur son support (degrés)" Style="{StaticResource FieldLabel}" />
+                                <ComboBox x:Name="RotationCombo" Width="140" HorizontalAlignment="Left" SelectedItem="{Binding Camera.Rotation}" />
+                                <TextBlock Text="Délai maximal pour recevoir une photo (secondes)" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Camera.CaptureTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Conseils pour le Canon EOS 1300D">
+                            <TextBlock Style="{StaticResource Help}" FontSize="15">
+                                • Molette sur M (manuel) et objectif en MF (mise au point manuelle), faite une fois sur la place des invités.<LineBreak />
+                                • Qualité d'image : JPEG « M » (plus rapide à transférer sur l'USB 2.0 du 1300D). Pas de RAW.<LineBreak />
+                                • Menu : extinction automatique « Désactivée », Wi-Fi « Désactivé » (sinon l'USB ne fonctionne pas).<LineBreak />
+                                • Alimentation secteur DR-E10 + ACK-E10 à la place de la batterie pour les longs événements.<LineBreak />
+                                • Fermez EOS Utility et désactivez l'importation automatique de Windows (Photos).
+                            </TextBlock>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================================================================ Impression -->
+            <TabItem Header="Impression" Padding="16,8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16" MaxWidth="1150" HorizontalAlignment="Left">
+                        <GroupBox Header="Imprimante">
+                            <StackPanel>
+                                <CheckBox Content="Impression activée" IsChecked="{Binding Print.Enabled}" />
+                                <TextBlock Text="Imprimante Windows à utiliser (installez d'abord le pilote DNP de votre modèle)" Style="{StaticResource FieldLabel}" />
+                                <WrapPanel>
+                                    <ComboBox x:Name="PrinterCombo" Width="480" Margin="0,2,8,8" SelectionChanged="PrinterCombo_SelectionChanged" />
+                                    <Button Content="Actualiser la liste" Click="RefreshPrinters_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="PrinterModeHelp" Style="{StaticResource Help}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Réglages du pilote par format">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource Help}">
+                                    Avec une DNP, cliquez sur « Réglages automatiques DNP » : LibreBooth prépare le 10x15 (papier 6x4, coupe standard)
+                                    et les bandelettes (papier 6x4, coupe 2 pouces). Sinon, ouvrez la fenêtre du pilote pour chaque format.
+                                    LibreBooth mémorise ces réglages et les réapplique à chaque impression.
+                                </TextBlock>
+                                <WrapPanel>
+                                    <Button Content="Réglages automatiques DNP (recommandé)" FontWeight="SemiBold" Click="AutoDnp_Click" />
+                                </WrapPanel>
+                                <ItemsControl x:Name="ProfilesList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="#DDD" BorderThickness="0,0,0,1" Padding="0,6">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="160" />
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="1" Text="{Binding StateText}" FontWeight="Normal" VerticalAlignment="Center" TextWrapping="Wrap" />
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                                        <Button Content="Réglages du pilote…" Tag="{Binding}" Click="DriverSettings_Click" />
+                                                        <Button Content="Page de test" Tag="{Binding}" Click="TestPage_Click" />
+                                                        <Button Content="Réinitialiser" Tag="{Binding}" Click="ResetDriver_Click" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock x:Name="ProfileStatusText" Style="{StaticResource Help}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Copies">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource Help}">
+                                    Le nombre d'exemplaires que l'invité peut choisir se règle pour chaque événement, dans l'onglet Personnalisation.
+                                </TextBlock>
+                                <CheckBox Content="Impression automatique dès que le montage est prêt" IsChecked="{Binding Print.AutoPrint}" />
+                                <TextBlock Text="Nombre d'impressions automatiques (sans dépasser le maximum de l'événement)" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Print.AutoPrintCopies, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Limite d'impressions pour tout l'événement (0 = illimité)" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Print.EventPrintLimit, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="État de l'imprimante et papier">
+                            <StackPanel>
+                                <TextBlock x:Name="PrinterStateText" FontSize="18" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock x:Name="RemainingText" Style="{StaticResource Value}" />
+                                <TextBlock x:Name="PrinterDetailsText" Style="{StaticResource Help}" />
+                                <WrapPanel>
+                                    <Button Content="Actualiser l'état" Click="RefreshPrinterState_Click" />
+                                </WrapPanel>
+                                <CheckBox Content="Lire le compteur et les erreurs de la DNP (cspstat.dll)" IsChecked="{Binding Print.UseDnpStatus}" />
+                                <TextBlock Text="Alerte « papier bientôt terminé » à partir de (tirages restants)" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Print.LowMediaWarning, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Compteur LibreBooth (utilisé si le compteur DNP est indisponible) : capacité du rouleau" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Print.MediaCapacity, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock x:Name="MediaCounterText" Style="{StaticResource Value}" />
+                                <WrapPanel>
+                                    <Button Content="J'ai installé un nouveau rouleau" Click="NewRoll_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================================================================ Modèles -->
+            <TabItem Header="Modèles" Padding="16,8">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource Help}" FontSize="15">
+                        Les formats proposés aux invités, le thème, les textes et le fond se choisissent pour chaque événement, dans l'onglet Personnalisation.
+                        Ici, vous gérez la liste des modèles. Les deux modèles de LibreBooth sont personnalisables. Vous pouvez aussi importer un cadre PNG
+                        fait dans Canva ou Photoshop, avec des zones transparentes pour les photos (1800 × 1200 px pour un 10x15, 600 × 1800 px pour une
+                        bandelette 5x15) : il garde alors son propre décor.
+                    </TextBlock>
+                    <ListBox x:Name="TemplatesList" Grid.Row="1" Margin="0,8">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="200" Height="140" Background="#EEE" Margin="0,0,16,0">
+                                        <Image Source="{Binding Preview}" Stretch="Uniform" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Details}" FontWeight="Normal" Foreground="#555" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <WrapPanel Grid.Row="2">
+                        <Button Content="Importer un cadre PNG…" Click="ImportTemplate_Click" />
+                        <Button Content="Modifier…" Click="EditTemplate_Click" />
+                        <Button Content="Dupliquer" Click="DuplicateTemplate_Click" />
+                        <Button Content="Supprimer" Click="DeleteTemplate_Click" />
+                        <Button Content="Ouvrir le dossier des modèles" Click="OpenTemplatesFolder_Click" />
+                    </WrapPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- ================================================================ Écrans -->
+            <TabItem Header="Écrans" Padding="16,8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16" MaxWidth="1150" HorizontalAlignment="Left">
+                        <GroupBox Header="Textes">
+                            <StackPanel>
+                                <TextBlock Text="Titre de l'écran d'accueil (vide = nom de l'événement)" Style="{StaticResource FieldLabel}" />
+                                <TextBox Text="{Binding Screens.Title, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Invitation sous le titre" Style="{StaticResource FieldLabel}" />
+                                <TextBox Text="{Binding Screens.StartText, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Titre de l'écran de fin" Style="{StaticResource FieldLabel}" />
+                                <TextBox Text="{Binding Screens.ThanksText, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Message de fin après une impression" Style="{StaticResource FieldLabel}" />
+                                <TextBox Text="{Binding Screens.ThanksPrintText, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Affichage">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource Help}">
+                                    Les couleurs des écrans, la police des titres et l'image de l'écran d'accueil se règlent pour chaque événement,
+                                    dans l'onglet Personnalisation (groupe « Écrans du photobooth ») : elles s'accordent aux impressions.
+                                </TextBlock>
+                                <CheckBox Content="Masquer le pointeur de la souris quand elle ne bouge pas (il réapparaît dès qu'on la bouge)" IsChecked="{Binding Screens.HideCursor}" />
+                                <TextBlock Style="{StaticResource Help}" Margin="24,0,0,8">
+                                    La souris marche comme l'écran tactile : un clic vaut un appui. Pour ouvrir l'admin : bouton gauche maintenu 3 secondes
+                                    en haut à droite de l'écran, ou Ctrl + Maj + A.
+                                </TextBlock>
+                                <CheckBox Content="Toujours au premier plan" IsChecked="{Binding Screens.Topmost}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Rythme">
+                            <StackPanel>
+                                <TextBlock Text="Compte à rebours avant chaque photo (secondes)" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Screens.CountdownSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Affichage de chaque photo après la prise (millisecondes)" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Screens.PreviewMilliseconds, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Retour automatique si personne ne touche l'écran (secondes) : choix du format / revue / e-mail / fin / erreur" Style="{StaticResource FieldLabel}" />
+                                <WrapPanel>
+                                    <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.ChooseTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.ReviewTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.EmailTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.ThanksSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.ErrorSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                </WrapPanel>
+                                <TextBlock Text="Touche qui lance une session (bouton d'arcade USB qui imite un clavier)" Style="{StaticResource FieldLabel}" />
+                                <ComboBox x:Name="StartKeyCombo" Width="160" HorizontalAlignment="Left" SelectedItem="{Binding Screens.StartKey}" />
+                                <TextBlock Text="Bouton « Recommencer » sur l'écran de la photo : nombre de fois par invité (0 = pas de bouton)" Style="{StaticResource FieldLabel}" />
+                                <ComboBox x:Name="RetakeCombo" Width="100" HorizontalAlignment="Left" SelectedItem="{Binding Screens.RetakeLimit}" />
+                                <TextBlock Style="{StaticResource Help}">
+                                    L'invité refait toute sa série tant qu'il n'a ni imprimé ni demandé d'e-mail. Les photos refusées sont gardées
+                                    dans le dossier « refusees » de l'événement. Le bouton n'apparaît pas avec l'impression automatique.
+                                </TextBlock>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================================================================ E-mail -->
+            <TabItem Header="E-mail" Padding="16,8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16" MaxWidth="1150" HorizontalAlignment="Left">
+                        <GroupBox Header="Serveur d'envoi (SMTP)">
+                            <StackPanel>
+                                <CheckBox Content="Proposer l'envoi par e-mail aux invités" IsChecked="{Binding Email.Enabled}" />
+                                <TextBlock Style="{StaticResource Help}">
+                                    Gmail : serveur smtp.gmail.com, port 587, STARTTLS, identifiant = votre adresse Gmail, mot de passe = un « mot de passe d'application »
+                                    (Compte Google › Sécurité › Validation en deux étapes › Mots de passe des applications). Orange : smtp.orange.fr, port 465, SSL.
+                                </TextBlock>
+                                <TextBlock Text="Serveur SMTP" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="420" HorizontalAlignment="Left" Text="{Binding Email.SmtpHost, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Port" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Email.SmtpPort, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Sécurité" Style="{StaticResource FieldLabel}" />
+                                <ComboBox x:Name="SecurityCombo" Width="200" HorizontalAlignment="Left" SelectedItem="{Binding Email.Security}" />
+                                <TextBlock Text="Identifiant" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="420" HorizontalAlignment="Left" Text="{Binding Email.Username, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Mot de passe (enregistré chiffré par Windows)" Style="{StaticResource FieldLabel}" />
+                                <WrapPanel>
+                                    <PasswordBox x:Name="SmtpPasswordBox" Width="300" Margin="0,2,8,8" />
+                                    <Button Content="Enregistrer le mot de passe" Click="SavePassword_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="PasswordStateText" Style="{StaticResource Help}" />
+                                <TextBlock Text="Adresse d'expéditeur" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="420" HorizontalAlignment="Left" Text="{Binding Email.FromAddress, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Nom d'expéditeur" Style="{StaticResource FieldLabel}" />
+                                <TextBox Width="420" HorizontalAlignment="Left" Text="{Binding Email.FromName, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Message envoyé aux invités ({evenement} et {date} sont remplacés)">
+                            <StackPanel>
+                                <TextBlock Text="Objet" Style="{StaticResource FieldLabel}" />
+                                <TextBox Text="{Binding Email.Subject, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Texte" Style="{StaticResource FieldLabel}" />
+                                <TextBox Height="120" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Text="{Binding Email.Body, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Text="Mention RGPD affichée sous l'adresse" Style="{StaticResource FieldLabel}" />
+                                <TextBox Height="60" AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding Email.ConsentText, UpdateSourceTrigger=PropertyChanged}" />
+                                <CheckBox Content="Exiger que l'invité coche la mention avant l'envoi" IsChecked="{Binding Email.RequireConsent}" />
+                                <CheckBox Content="Joindre aussi les photos d'origine (en plus du montage)" IsChecked="{Binding Email.AttachOriginals}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Test et file d'attente">
+                            <StackPanel>
+                                <TextBlock Text="Adresse de test" Style="{StaticResource FieldLabel}" />
+                                <WrapPanel>
+                                    <TextBox x:Name="TestAddressBox" Width="360" Margin="0,2,8,8" />
+                                    <Button x:Name="TestEmailButton" Content="Envoyer un e-mail de test" Click="SendTestEmail_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="TestEmailResult" Style="{StaticResource Value}" />
+                                <TextBlock x:Name="OutboxStatusText" Style="{StaticResource Value}" Margin="0,12,0,4" />
+                                <WrapPanel>
+                                    <Button Content="Réessayer maintenant" Click="RetryOutbox_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- ================================================================ Journal -->
+            <TabItem Header="Journal" Padding="16,8">
+                <Grid Margin="16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBox x:Name="LogText" IsReadOnly="True" FontFamily="Consolas" FontSize="13" TextWrapping="NoWrap"
+                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+                    <WrapPanel Grid.Row="1" Margin="0,8,0,0">
+                        <Button Content="Actualiser" Click="RefreshLog_Click" />
+                        <Button Content="Ouvrir le dossier des journaux" Click="OpenLogFolder_Click" />
+                    </WrapPanel>
+                </Grid>
+            </TabItem>
+
+            <!-- ================================================================ Système -->
+            <TabItem Header="Système" Padding="16,8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="16" MaxWidth="1150" HorizontalAlignment="Left">
+                        <GroupBox Header="Code PIN de l'admin">
+                            <StackPanel>
+                                <TextBlock Text="Nouveau code (4 à 8 chiffres)" Style="{StaticResource FieldLabel}" />
+                                <PasswordBox x:Name="NewPinBox" Width="200" HorizontalAlignment="Left" />
+                                <TextBlock Text="Confirmation" Style="{StaticResource FieldLabel}" />
+                                <PasswordBox x:Name="ConfirmPinBox" Width="200" HorizontalAlignment="Left" />
+                                <WrapPanel>
+                                    <Button Content="Changer le code" Click="ChangePin_Click" />
+                                </WrapPanel>
+                                <TextBlock x:Name="PinStatusText" Style="{StaticResource Help}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="Démarrage">
+                            <StackPanel>
+                                <CheckBox Content="Lancer LibreBooth automatiquement au démarrage de Windows" IsChecked="{Binding LaunchAtStartup}" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox Header="À propos de LibreBooth">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Image Source="pack://application:,,,/Resources/logo-librebooth.png" Width="220" Margin="0,4,24,4"
+                                       VerticalAlignment="Top" RenderOptions.BitmapScalingMode="HighQuality" />
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock x:Name="VersionText" FontSize="18" FontWeight="SemiBold" Margin="0,2,0,4" />
+                                    <TextBlock Style="{StaticResource Value}">
+                                        <Run Text="Conçu et réalisé par" /> <Run Text="Loïs Gonçalves" FontWeight="SemiBold" />
+                                    </TextBlock>
+                                    <TextBlock Style="{StaticResource Value}" Text="Logiciel de photobooth gratuit, sans licence ni abonnement. © 2026 Loïs Gonçalves." />
+                                    <TextBlock Style="{StaticResource Help}"
+                                               Text="Avec les bibliothèques libres .NET et WPF, SkiaSharp, MailKit, CommunityToolkit.Mvvm et Serilog. Les pilotes Canon (EDSDK) et DNP (cspstat.dll) appartiennent à leurs fabricants." />
+                                    <TextBlock x:Name="ModeText" Style="{StaticResource Value}" />
+                                    <TextBlock x:Name="DataFolderText" Style="{StaticResource Value}" />
+                                    <WrapPanel>
+                                        <Button Content="Ouvrir le dossier des données" Click="OpenDataFolder_Click" />
+                                        <Button Content="Vérifier l'installation" FontWeight="SemiBold" Click="Verify_Click" />
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Grid>
+                        </GroupBox>
+
+                        <GroupBox Header="Quitter">
+                            <StackPanel>
+                                <TextBlock Text="Ferme complètement LibreBooth (l'appareil photo et l'imprimante sont libérés)." Style="{StaticResource Help}" />
+                                <WrapPanel>
+                                    <Button Content="Quitter LibreBooth" Click="Quit_Click" Foreground="DarkRed" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </GroupBox>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="2" Background="#F3F3F3" BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="12">
+            <DockPanel>
+                <Button x:Name="StartBoothButton" DockPanel.Dock="Right" Click="Close_Click" Cursor="Hand" Margin="0"
+                        ToolTip="Ferme l'administration et lance l'écran d'accueil pour les invités">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="#1E7B34" CornerRadius="6" Padding="26,10">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#25953F" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#17632A" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE768;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="18" Foreground="White"
+                                   VerticalAlignment="Center" Margin="0,0,12,0" />
+                        <TextBlock Text="Démarrer le photobooth" FontSize="18" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="QuitAppButton" DockPanel.Dock="Right" Click="Quit_Click" Cursor="Hand" Margin="0,0,12,0"
+                        ToolTip="Ferme complètement LibreBooth (l'appareil photo et l'imprimante sont libérés)">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="Bd" Background="White" BorderBrush="#C9A2A4" BorderThickness="1" CornerRadius="6" Padding="20,10">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#FBEFEF" />
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="#F3DADB" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7E8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Foreground="#A4262C"
+                                   VerticalAlignment="Center" Margin="0,0,10,0" />
+                        <TextBlock Text="Quitter LibreBooth" FontSize="16" FontWeight="SemiBold" Foreground="#A4262C" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+                <TextBlock x:Name="FooterText" VerticalAlignment="Center" Foreground="#555" TextTrimming="CharacterEllipsis" Margin="0,0,16,0" />
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

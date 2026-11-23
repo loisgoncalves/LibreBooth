@@ -1,0 +1,70 @@
+<UserControl x:Class="LibreBooth.App.Views.Kiosk.ShootingView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Live view : toujours sur fond noir, textes en blanc quel que soit le thème -->
+    <Grid Background="Black" ClipToBounds="True" TextElement.Foreground="White">
+        <Grid.Resources>
+            <SolidColorBrush x:Key="SurfaceBorderBrush" Color="#33FFFFFF" />
+        </Grid.Resources>
+        <!-- Live view (effet miroir et rotation selon les réglages) -->
+        <Image Source="{Binding LiveImage}" Stretch="UniformToFill" RenderTransformOrigin="0.5,0.5"
+               HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Image.LayoutTransform>
+                <RotateTransform Angle="{Binding RotationAngle}" />
+            </Image.LayoutTransform>
+            <Image.RenderTransform>
+                <ScaleTransform ScaleX="{Binding MirrorScaleX}" />
+            </Image.RenderTransform>
+        </Image>
+
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                    Visibility="{Binding IsWaitingForCamera, Converter={StaticResource BoolToVisibility}}">
+            <Control Style="{StaticResource Spinner}" />
+            <TextBlock Text="Préparation de l'appareil…" FontSize="48" Margin="0,36,0,0" HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <Border VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,40,0,0" Background="#99000000" CornerRadius="44" Padding="44,14">
+            <TextBlock Text="{Binding ShotLabel}" FontSize="44" FontWeight="SemiBold" />
+        </Border>
+
+        <!-- Compte à rebours -->
+        <Viewbox MaxWidth="1700" MaxHeight="640" Stretch="Uniform"
+                 Visibility="{Binding IsCountdownVisible, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{Binding CountdownText, NotifyOnTargetUpdated=True}" FontSize="300" FontWeight="Bold"
+                       Foreground="White" RenderTransformOrigin="0.5,0.5" TextAlignment="Center">
+                <TextBlock.RenderTransform>
+                    <ScaleTransform />
+                </TextBlock.RenderTransform>
+                <TextBlock.Effect>
+                    <DropShadowEffect BlurRadius="40" ShadowDepth="0" Opacity="0.75" />
+                </TextBlock.Effect>
+                <TextBlock.Triggers>
+                    <EventTrigger RoutedEvent="Binding.TargetUpdated">
+                        <BeginStoryboard>
+                            <Storyboard>
+                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1.35" To="1" Duration="0:0:0.35" />
+                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1.35" To="1" Duration="0:0:0.35" />
+                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.2" To="1" Duration="0:0:0.25" />
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </TextBlock.Triggers>
+            </TextBlock>
+        </Viewbox>
+
+        <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,70" Background="#99000000" CornerRadius="30" Padding="36,12"
+                Visibility="{Binding StatusText, Converter={StaticResource NullToCollapsed}}">
+            <TextBlock Text="{Binding StatusText}" FontSize="38" />
+        </Border>
+
+        <!-- Aperçu de la photo qui vient d'être prise -->
+        <Border Background="#D9000000" Visibility="{Binding IsPreviewVisible, Converter={StaticResource BoolToVisibility}}">
+            <Border BorderBrush="White" BorderThickness="14" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="120">
+                <Image Source="{Binding PreviewImage}" Stretch="Uniform" MaxHeight="820" />
+            </Border>
+        </Border>
+
+        <!-- Flash blanc au moment du déclenchement -->
+        <Rectangle x:Name="FlashOverlay" Fill="White" Opacity="0" IsHitTestVisible="False" />
+    </Grid>
+</UserControl>

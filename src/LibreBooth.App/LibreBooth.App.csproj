@@ -1,0 +1,61 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>LibreBooth</AssemblyName>
+    <RootNamespace>LibreBooth.App</RootNamespace>
+    <StartupObject>LibreBooth.App.Program</StartupObject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- 32 bits obligatoire : les DLL Canon (EDSDK 13.11) et DNP (cspstat.dll) sont en 32 bits. -->
+    <PlatformTarget>x86</PlatformTarget>
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+
+    <Product>LibreBooth</Product>
+    <Description>Logiciel de photobooth gratuit</Description>
+    <Authors>Loïs Gonçalves</Authors>
+    <Company>Loïs Gonçalves</Company>
+    <Copyright>© 2026 Loïs Gonçalves</Copyright>
+    <Version>1.5.0</Version>
+    <!-- Logo de LibreBooth (assets\) : icône de l'exe, des raccourcis et des fenêtres -->
+    <ApplicationIcon>..\..\assets\LibreBooth.ico</ApplicationIcon>
+    <SatelliteResourceLanguages>fr</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <!--
+    Pilotes des fabricants (Canon, DNP), copiés à côté de LibreBooth.exe s'ils sont présents dans drivers\.
+    Ils ne sont jamais publiés : pour la version publique, -p:BundleVendorDrivers=false les écarte même s'ils sont là.
+  -->
+  <ItemGroup Condition="'$(BundleVendorDrivers)' != 'false'">
+    <None Include="..\..\drivers\canon\*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    <None Include="..\..\drivers\dnp\*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Logo affiché dans l'admin, sur le code PIN et dans la vérification -->
+    <Resource Include="..\..\assets\icone-librebooth.png" Link="Resources\icone-librebooth.png" />
+    <Resource Include="..\..\assets\logo-librebooth.png" Link="Resources\logo-librebooth.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Les projets WPF n'importent pas System.IO automatiquement (conflit de nom avec Shapes.Path). -->
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LibreBooth.Core\LibreBooth.Core.csproj" />
+  </ItemGroup>
+
+</Project>

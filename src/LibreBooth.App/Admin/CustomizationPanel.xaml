@@ -1,0 +1,440 @@
+<UserControl x:Class="LibreBooth.App.Admin.CustomizationPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             TextElement.FontSize="16" TextElement.FontFamily="Segoe UI">
+    <UserControl.Resources>
+        <Style TargetType="GroupBox">
+            <Setter Property="Margin" Value="0,0,0,14" />
+            <Setter Property="Padding" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="Margin" Value="0,4,8,4" />
+            <Setter Property="MinHeight" Value="34" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="Margin" Value="0,2,0,6" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Margin" Value="0,5,18,5" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="RadioButton">
+            <Setter Property="Margin" Value="0,4,20,4" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Margin" Value="0,2,8,6" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="FontWeight" Value="Normal" />
+        </Style>
+        <Style TargetType="Slider">
+            <Setter Property="Margin" Value="0,4,8,4" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="IsSnapToTickEnabled" Value="True" />
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Margin" Value="0,6,0,2" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Foreground" Value="#333" />
+        </Style>
+        <Style x:Key="Help" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#666" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Margin" Value="0,4,0,6" />
+        </Style>
+        <Style x:Key="Swatch" TargetType="Button">
+            <Setter Property="Width" Value="44" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Margin" Value="0,2,8,6" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="ToolTip" Value="Choisir la couleur" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="#888" BorderThickness="1" CornerRadius="4" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="ModeCard" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontWeight" Value="Normal" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="White" BorderBrush="#CFCFCF" BorderThickness="2" CornerRadius="8" Padding="14,10">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#8DB8E8" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#1E6FC8" />
+                                <Setter TargetName="Bd" Property="Background" Value="#EAF3FD" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="620" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ================================================================ Réglages -->
+        <ScrollViewer x:Name="SettingsScroll" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="16,16,10,16">
+                <TextBlock x:Name="EventTitle" FontSize="20" FontWeight="Bold" Margin="0,0,0,10" TextWrapping="Wrap" />
+
+                <!-- Le mode de personnalisation : un thème de LibreBooth, ou vos propres images -->
+                <UniformGrid Columns="2" Margin="0,0,0,14">
+                    <RadioButton x:Name="ThemeModeRadio" GroupName="DesignMode" Style="{StaticResource ModeCard}" Margin="0,0,6,0" Checked="Mode_Checked">
+                        <StackPanel>
+                            <TextBlock Text="&#xE790;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="24" Foreground="#1E6FC8" />
+                            <TextBlock Text="Thème LibreBooth" FontSize="17" FontWeight="SemiBold" Margin="0,4,0,2" />
+                            <TextBlock Text="Un thème prêt à l'emploi (couleurs, polices, décor), à retoucher si besoin." Foreground="#555" FontSize="13" TextWrapping="Wrap" FontWeight="Normal" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="OwnModeRadio" GroupName="DesignMode" Style="{StaticResource ModeCard}" Margin="6,0,0,0" Checked="Mode_Checked">
+                        <StackPanel>
+                            <TextBlock Text="&#xEB9F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="24" Foreground="#1E6FC8" />
+                            <TextBlock Text="Mes propres images" FontSize="17" FontWeight="SemiBold" Margin="0,4,0,2" />
+                            <TextBlock Text="Vos fonds faits dans Canva ou Photoshop, votre logo et votre image d'accueil." Foreground="#555" FontSize="13" TextWrapping="Wrap" FontWeight="Normal" />
+                        </StackPanel>
+                    </RadioButton>
+                </UniformGrid>
+
+                <GroupBox x:Name="ThemeGroup" Header="Thème">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource Help}" Margin="0,0,0,6">
+                            Un thème règle d'un coup les couleurs, les polices, le décor et le style des photos.
+                            Vous pouvez ensuite tout retoucher dans « Couleurs, polices et décor ». Vos textes, votre logo et votre image d'accueil sont conservés.
+                        </TextBlock>
+                        <ItemsControl x:Name="ThemesList">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Click="Theme_Click" Tag="{Binding}" Padding="4" Margin="0,0,8,8" Background="White"
+                                            BorderThickness="{Binding BorderThickness}" BorderBrush="{Binding BorderBrush}" ToolTip="{Binding Description}">
+                                        <StackPanel Width="158">
+                                            <Border Height="106" Background="#EEE">
+                                                <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="2,4,0,0" />
+                                            <TextBlock Text="{Binding Category}" Foreground="#666" FontSize="13" Margin="2,0,0,2" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox x:Name="ImagesGroup" Header="Mes images">
+                    <StackPanel>
+                        <StackPanel x:Name="OwnBackgroundsPanel">
+                            <TextBlock Style="{StaticResource Help}" Margin="0,0,0,6">
+                                1. Exportez le gabarit du format. 2. Dessinez votre fond dans Canva ou Photoshop à la même taille.
+                                3. Importez-le : les photos des invités sont posées par-dessus. Un format sans image garde le thème.
+                            </TextBlock>
+                            <ItemsControl x:Name="BackgroundsList">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border BorderBrush="#DDD" BorderThickness="0,0,0,1" Padding="0,6">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Border Width="120" Height="84" Background="#EEE" BorderBrush="#CCC" BorderThickness="1" Margin="0,2,12,0" VerticalAlignment="Top">
+                                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                                                </Border>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{Binding State}" FontWeight="Normal" Foreground="#555" TextWrapping="Wrap" />
+                                                    <WrapPanel>
+                                                        <Button Content="Exporter le gabarit…" Tag="{Binding}" Click="ExportGuide_Click" />
+                                                        <Button Content="Choisir mon fond…" Tag="{Binding}" Click="ChooseBackground_Click" />
+                                                        <Button Content="Retirer" Tag="{Binding}" Click="RemoveBackground_Click" IsEnabled="{Binding HasBackground}" />
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <CheckBox x:Name="TextsOverBackgroundCheck" Content="Écrire aussi les textes de LibreBooth sur mes fonds" Checked="Changed" Unchecked="Changed" />
+                        </StackPanel>
+
+                        <Border BorderBrush="#DDD" BorderThickness="0,0,0,1" Padding="0,6">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="120" Height="84" Background="#EEE" BorderBrush="#CCC" BorderThickness="1" Margin="0,2,12,0" VerticalAlignment="Top">
+                                    <Image x:Name="LogoThumb" Stretch="Uniform" Margin="6" RenderOptions.BitmapScalingMode="HighQuality" />
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Logo" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="LogoStateText" FontWeight="Normal" Foreground="#555" TextWrapping="Wrap" />
+                                    <WrapPanel>
+                                        <Button Content="Choisir un logo…" Click="ChooseLogo_Click" />
+                                        <Button x:Name="RemoveLogoButton" Content="Retirer" Click="RemoveLogo_Click" />
+                                    </WrapPanel>
+                                    <TextBlock Style="{StaticResource Help}" Margin="0,0,0,0">
+                                        PNG à fond transparent conseillé. À droite des textes sur le 10x15, en bas du marque-page.
+                                    </TextBlock>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Padding="0,6,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="120" Height="84" Background="#EEE" BorderBrush="#CCC" BorderThickness="1" Margin="0,2,12,0" VerticalAlignment="Top">
+                                    <Image x:Name="AttractThumb" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                                </Border>
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="Image de l'écran d'accueil du photobooth" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="AttractStateText" FontWeight="Normal" Foreground="#555" TextWrapping="Wrap" />
+                                    <WrapPanel>
+                                        <Button Content="Choisir une image…" Click="ChooseAttract_Click" />
+                                        <Button x:Name="RemoveAttractButton" Content="Retirer" Click="RemoveAttract_Click" />
+                                        <Button Content="Voir l'écran d'accueil" Click="ShowAttractPreview_Click" />
+                                    </WrapPanel>
+                                    <TextBlock Style="{StaticResource Help}" Margin="0,0,0,0">
+                                        Format écran 16:9 (1920 × 1080 px conseillé). Le titre et l'invitation s'écrivent par-dessus, en blanc.
+                                    </TextBlock>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock x:Name="KioskColorsText" Style="{StaticResource Help}" Margin="0,10,0,0" />
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="Textes">
+                    <StackPanel>
+                        <TextBlock Text="Titre" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="TitleBox" TextChanged="Changed" />
+                        <TextBlock Text="Sous-titre (la date en général)" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="SubtitleBox" TextChanged="Changed" />
+                        <TextBlock Text="Phrase (facultative : remerciement, hashtag…)" Style="{StaticResource FieldLabel}" />
+                        <TextBox x:Name="PhraseBox" TextChanged="Changed" />
+                        <TextBlock Style="{StaticResource Help}">
+                            {evenement} = nom de l'événement · {date} = 22.11.2026 · {date_longue} = 22 novembre 2026.
+                            Laissez une case vide pour ne rien écrire. Le texte rétrécit tout seul s'il est trop long.
+                        </TextBlock>
+                    </StackPanel>
+                </GroupBox>
+
+                <GroupBox Header="Formats proposés aux invités">
+                    <StackPanel>
+                        <ItemsControl x:Name="FormatsList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding IsChecked}" Margin="0,4">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding Details}" Foreground="#666" FontSize="14" />
+                                        </StackPanel>
+                                    </CheckBox>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <WrapPanel Margin="0,8,0,0">
+                            <TextBlock Text="Exemplaires : l'invité choisit de 1 à" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <ComboBox x:Name="MaxCopiesCombo" Width="70" SelectionChanged="Changed" />
+                            <TextBlock Text="par photo" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="0" />
+                        </WrapPanel>
+                        <TextBlock Style="{StaticResource Help}">
+                            Marque-page : un exemplaire = une feuille 10x15 coupée par la DNP en deux marque-pages identiques.
+                        </TextBlock>
+                    </StackPanel>
+                </GroupBox>
+
+                <Expander x:Name="AdvancedExpander" Header="Couleurs, polices et décor" FontWeight="SemiBold" Margin="0,0,0,14" IsExpanded="True">
+                    <StackPanel Margin="0,8,0,0">
+                    <GroupBox Header="Polices">
+                        <StackPanel>
+                            <TextBlock Text="Titre" Style="{StaticResource FieldLabel}" />
+                            <WrapPanel>
+                                <ComboBox x:Name="TitleFontCombo" Width="250" SelectionChanged="Changed" MaxDropDownHeight="420">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontFamily="{Binding}" FontSize="18" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <ComboBox x:Name="TitleWeightCombo" Width="130" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="Changed" />
+                                <CheckBox x:Name="TitleItalicCheck" Content="Italique" Checked="Changed" Unchecked="Changed" />
+                                <CheckBox x:Name="TitleUpperCheck" Content="MAJUSCULES espacées" Checked="Changed" Unchecked="Changed" />
+                            </WrapPanel>
+                            <WrapPanel>
+                                <TextBlock Text="Taille" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <Slider x:Name="TitleScaleSlider" Width="260" Minimum="50" Maximum="160" TickFrequency="5" ValueChanged="SliderChanged" />
+                                <TextBlock x:Name="TitleScaleText" VerticalAlignment="Center" FontWeight="Normal" />
+                            </WrapPanel>
+
+                            <TextBlock Text="Date et phrase" Style="{StaticResource FieldLabel}" Margin="0,12,0,2" />
+                            <WrapPanel>
+                                <ComboBox x:Name="TextFontCombo" Width="250" SelectionChanged="Changed" MaxDropDownHeight="420">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding}" FontFamily="{Binding}" FontSize="18" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <ComboBox x:Name="TextWeightCombo" Width="130" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="Changed" />
+                                <CheckBox x:Name="TextItalicCheck" Content="Italique" Checked="Changed" Unchecked="Changed" />
+                                <CheckBox x:Name="TextUpperCheck" Content="MAJUSCULES espacées" Checked="Changed" Unchecked="Changed" />
+                            </WrapPanel>
+                            <WrapPanel>
+                                <TextBlock Text="Taille" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <Slider x:Name="TextScaleSlider" Width="260" Minimum="50" Maximum="160" TickFrequency="5" ValueChanged="SliderChanged" />
+                                <TextBlock x:Name="TextScaleText" VerticalAlignment="Center" FontWeight="Normal" />
+                            </WrapPanel>
+                            <TextBlock x:Name="FontWarningText" Style="{StaticResource Help}" Foreground="DarkRed" />
+                        </StackPanel>
+                    </GroupBox>
+
+                    <GroupBox Header="Couleurs">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="170" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition />
+                                <RowDefinition />
+                                <RowDefinition />
+                                <RowDefinition />
+                                <RowDefinition />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Fond" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                            <Button x:Name="BackgroundSwatch" Grid.Column="1" Style="{StaticResource Swatch}" Tag="{Binding ElementName=BackgroundColorBox}" Click="Swatch_Click" />
+                            <TextBox x:Name="BackgroundColorBox" Grid.Column="2" TextChanged="Changed" />
+
+                            <TextBlock Grid.Row="1" Text="Titre" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                            <Button x:Name="TitleSwatch" Grid.Row="1" Grid.Column="1" Style="{StaticResource Swatch}" Tag="{Binding ElementName=TitleColorBox}" Click="Swatch_Click" />
+                            <TextBox x:Name="TitleColorBox" Grid.Row="1" Grid.Column="2" TextChanged="Changed" />
+
+                            <TextBlock Grid.Row="2" Text="Date et phrase" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                            <Button x:Name="TextSwatch" Grid.Row="2" Grid.Column="1" Style="{StaticResource Swatch}" Tag="{Binding ElementName=TextColorBox}" Click="Swatch_Click" />
+                            <TextBox x:Name="TextColorBox" Grid.Row="2" Grid.Column="2" TextChanged="Changed" />
+
+                            <TextBlock Grid.Row="3" Text="Décor (1re couleur)" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                            <Button x:Name="AccentSwatch" Grid.Row="3" Grid.Column="1" Style="{StaticResource Swatch}" Tag="{Binding ElementName=AccentColorBox}" Click="Swatch_Click" />
+                            <TextBox x:Name="AccentColorBox" Grid.Row="3" Grid.Column="2" TextChanged="Changed" />
+
+                            <TextBlock Grid.Row="4" Text="Décor (2e couleur)" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                            <Button x:Name="Accent2Swatch" Grid.Row="4" Grid.Column="1" Style="{StaticResource Swatch}" Tag="{Binding ElementName=Accent2ColorBox}" Click="Swatch_Click" />
+                            <TextBox x:Name="Accent2ColorBox" Grid.Row="4" Grid.Column="2" TextChanged="Changed" />
+                        </Grid>
+                    </GroupBox>
+
+                    <GroupBox Header="Décor et photos">
+                        <StackPanel>
+                            <WrapPanel>
+                                <TextBlock Text="Décor" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                <ComboBox x:Name="DecorCombo" Width="230" DisplayMemberPath="Label" SelectedValuePath="Value" SelectionChanged="Changed" />
+                            </WrapPanel>
+                            <WrapPanel>
+                                <TextBlock Text="Coins arrondis des photos" Style="{StaticResource FieldLabel}" Width="200" VerticalAlignment="Center" />
+                                <Slider x:Name="CornerSlider" Width="220" Minimum="0" Maximum="60" TickFrequency="2" ValueChanged="SliderChanged" />
+                                <TextBlock x:Name="CornerText" VerticalAlignment="Center" FontWeight="Normal" />
+                            </WrapPanel>
+                            <WrapPanel>
+                                <TextBlock Text="Bordure autour des photos" Style="{StaticResource FieldLabel}" Width="200" VerticalAlignment="Center" />
+                                <Slider x:Name="BorderSlider" Width="220" Minimum="0" Maximum="40" TickFrequency="2" ValueChanged="SliderChanged" />
+                                <TextBlock x:Name="BorderText" VerticalAlignment="Center" FontWeight="Normal" />
+                            </WrapPanel>
+                            <WrapPanel>
+                                <TextBlock Text="Couleur de la bordure" Style="{StaticResource FieldLabel}" Width="200" VerticalAlignment="Center" />
+                                <Button x:Name="BorderSwatch" Style="{StaticResource Swatch}" Tag="{Binding ElementName=BorderColorBox}" Click="Swatch_Click" />
+                                <TextBox x:Name="BorderColorBox" Width="110" TextChanged="Changed" />
+                            </WrapPanel>
+                            <WrapPanel>
+                                <CheckBox x:Name="ShadowCheck" Content="Ombre sous les photos" Checked="Changed" Unchecked="Changed" />
+                                <CheckBox x:Name="BlackWhiteCheck" Content="Photos en noir et blanc" Checked="Changed" Unchecked="Changed" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </GroupBox>
+
+                    </StackPanel>
+                </Expander>
+
+                <GroupBox Header="Reprendre la personnalisation d'un autre événement">
+                    <StackPanel>
+                        <WrapPanel>
+                            <ComboBox x:Name="CopyEventCombo" Width="380" />
+                            <Button Content="Copier ici" Click="CopyFromEvent_Click" />
+                        </WrapPanel>
+                        <TextBlock Style="{StaticResource Help}">Formats, exemplaires, thème, textes, fond, logo et image d'accueil sont repris tels quels.</TextBlock>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ================================================================ Aperçu -->
+        <Grid Grid.Column="1" Margin="10,16,16,16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <WrapPanel>
+                <TextBlock Text="Aperçu :" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <ItemsControl x:Name="PreviewFormatsList">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <RadioButton Content="{Binding Name}" GroupName="PreviewFormat" IsChecked="{Binding IsSelected}" Checked="PreviewFormat_Checked" Tag="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </WrapPanel>
+            <Border Grid.Row="1" Background="#2B2B30" CornerRadius="8" Padding="18" Margin="0,8">
+                <Grid>
+                    <Image x:Name="PreviewImage" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock x:Name="PreviewBusyText" Text="Aperçu en cours…" Foreground="#DDD" HorizontalAlignment="Center" VerticalAlignment="Bottom" />
+                </Grid>
+            </Border>
+            <StackPanel Grid.Row="2">
+                <TextBlock x:Name="PreviewNoteText" Style="{StaticResource Help}" />
+                <WrapPanel>
+                    <Button x:Name="PrintTestButton" Content="Imprimer un essai de ce format…" Click="PrintTest_Click" />
+                </WrapPanel>
+                <TextBlock x:Name="StatusText" Style="{StaticResource Help}" Foreground="#0A6" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>
