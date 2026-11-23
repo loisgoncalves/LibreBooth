@@ -22,26 +22,49 @@ public static class NativeDrivers
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "LibreBooth", FolderName);
 
     /// <summary>
-    /// À appeler au tout début du programme (avant le premier appel au pilote Canon ou DNP). Le dossier des
-    /// données imposé par --data est essayé en premier.
+    /// À appeler au tout début du programme (avant le premier appel au pilote Canon ou DNP). Avec --data, c'est
+    /// toujours le dossier « Pilotes » de ces données ; sinon le premier qui existe parmi les dossiers habituels.
     /// </summary>
     public static void Register(string[] args)
     {
         try
         {
-            var candidates = new List<string>();
-            var dataIndex = Array.FindIndex(args, a => string.Equals(a, "--data", StringComparison.OrdinalIgnoreCase));
-            if (dataIndex >= 0 && dataIndex + 1 < args.Length) candidates.Add(Path.GetFullPath(args[dataIndex + 1]));
-            candidates.AddRange(AppPaths.DefaultCandidates());
-            var folders = candidates.Select(root => Path.Combine(root, FolderName)).ToList();
             var inherited = Environment.GetEnvironmentVariable(FolderVariable);
-            if (!string.IsNullOrWhiteSpace(inherited)) folders.Insert(0, inherited);
-            UserFolder = folders.FirstOrDefault(Directory.Exists) ?? folders[0];
+            var dataIndex = Array.FindIndex(args, a => string.Equals(a, "--data", StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(inherited))
+            {
+                UserFolder = inherited;
+            }
+            else if (dataIndex >= 0 && dataIndex + 1 < args.Length)
+            {
+                UserFolder = Path.Combine(Path.GetFullPath(args[dataIndex + 1]), FolderName);
+            }
+            else
+            {
+                var folders = AppPaths.DefaultCandidates().Select(root => Path.Combine(root, FolderName)).ToList();
+                UserFolder = folders.FirstOrDefault(Directory.Exists) ?? folders[0];
+            }
             if (Directory.Exists(UserFolder)) SetDllDirectory(UserFolder);
         }
         catch
         {
             // Sans dossier « Pilotes », seuls les fichiers posés à côté de LibreBooth.exe sont utilisés.
+        }
+    }
+
+    /// <summary>
+    /// Après l'ajout de fichiers dans le dossier « Pilotes » pendant que LibreBooth tourne : Windows y cherche de
+    /// nouveau les DLL, sans relancer LibreBooth.
+    /// </summary>
+    public static void Refresh()
+    {
+        try
+        {
+            if (Directory.Exists(UserFolder)) SetDllDirectory(UserFolder);
+        }
+        catch
+        {
+            // Rien de plus à faire : un redémarrage de LibreBooth suffira.
         }
     }
 

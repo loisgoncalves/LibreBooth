@@ -3,6 +3,16 @@
 Chaque version a son propre numéro : le programme d'installation et le zip de la page « Releases » portent le
 même. La version installée s'affiche dans l'admin › Système.
 
+## 1.6.0 – 23/11/2026
+
+- **Installation guidée des pilotes** : le programme d'installation télécharge le pilote Windows 11 de la DNP DS620
+  sur le site officiel de DNP, contrôle son empreinte SHA-256, puis l'installe.
+- **SDK Canon en deux clics** : à la fin de l'installation, « Ouvrir la page Canon » puis « Choisir le SDK
+  téléchargé… » ; LibreBooth extrait lui-même EDSDK.dll et EdsImage.dll (32 bits) du zip de Canon.
+- Le même ajout depuis LibreBooth : admin › Appareil photo › « Ajouter le SDK Canon… », et dans la vérification de
+  l'installation. L'appareil photo est relancé aussitôt, sans redémarrer LibreBooth.
+- La désinstallation retire aussi les fichiers des fabricants posés à côté de LibreBooth.exe.
+
 ## 1.5.0 – 23/11/2026
 
 Première version publiée sur GitHub.

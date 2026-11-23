@@ -60,16 +60,20 @@ propres impressions, ses propres écrans et son propre dossier de photos.
 2. **Installez** : double-cliquez sur le programme d'installation. Il n'est pas signé par un éditeur : si Windows
    affiche « Windows a protégé votre ordinateur », cliquez **Informations complémentaires**, puis **Exécuter quand
    même**. LibreBooth s'installe dans `C:\Program Files (x86)\LibreBooth`, avec ses raccourcis.
-3. **Ajoutez les pilotes des fabricants** : ils ne sont pas fournis, car ils appartiennent à Canon et à DNP.
-   - **Appareil Canon (obligatoire)** : inscrivez-vous (gratuitement) au
-     [programme développeurs de Canon](https://www.canon-europe.com/business/imaging-solutions/sdk/) et téléchargez
-     le SDK **EDSDK**. Copiez `EDSDK.dll` et `EdsImage.dll` de sa version **32 bits** (dossier `EDSDK\Dll`) dans
-     `C:\Users\<nom>\LibreBooth\Pilotes` (dossier créé au premier lancement de LibreBooth), puis relancez LibreBooth.
-   - **Imprimante DNP** : installez son pilote Windows depuis la
-     [page Téléchargements de DNP](https://dnpphoto.eu/downloads/), puis branchez l'imprimante en USB.
-   - **Facultatif** : `cspstat.dll` (API d'état des imprimantes DNP), à copier aussi dans le dossier `Pilotes`. Elle
-     permet de lire le compteur de tirages et les erreurs (papier, ruban, capot). Sans elle, LibreBooth compte
-     lui-même ses tirages.
+3. **Pilotes des fabricants** : ils appartiennent à Canon et à DNP et ne peuvent pas être livrés avec LibreBooth.
+   Le programme d'installation s'en occupe avec vous :
+   - **Imprimante DNP DS620** : laissez cochée la case du pilote. Il est téléchargé sur le site officiel de DNP
+     (26 Mo), son empreinte SHA-256 est contrôlée, puis il est installé. Branchez ensuite la DS620 en USB et
+     allumez-la. Autre modèle DNP, ou pas d'Internet : installez son pilote depuis la
+     [page Téléchargements de DNP](https://dnpphoto.eu/downloads/).
+   - **Appareil Canon (obligatoire)** : à la fin de l'installation, cliquez **« 1. Ouvrir la page Canon »**,
+     inscrivez-vous (gratuitement) au [programme développeurs de Canon](https://www.canon-europe.com/business/imaging-solutions/sdk/)
+     et téléchargez le SDK **EDSDK** pour Windows. Cliquez ensuite **« 2. Choisir le SDK téléchargé… »** et
+     indiquez le zip reçu : LibreBooth en extrait lui-même `EDSDK.dll` et `EdsImage.dll` (version 32 bits). Vous
+     pouvez aussi le faire plus tard, dans LibreBooth : admin › Appareil photo › **« Ajouter le SDK Canon… »**.
+   - **Facultatif** : `cspstat.dll` (API d'état des imprimantes DNP), à copier dans
+     `C:\Users\<nom>\LibreBooth\Pilotes`. Elle permet de lire le compteur de tirages et les erreurs (papier, ruban,
+     capot). Sans elle, LibreBooth compte lui-même ses tirages.
 4. **Vérifiez** : à la fin de l'installation, laissez cochée **« Vérifier que tout fonctionne »**, ou plus tard :
    menu Démarrer › LibreBooth › « Vérifier l'installation de LibreBooth ». Chaque point manquant est expliqué.
 
@@ -171,11 +175,11 @@ illisible dans `config.json` et sur un autre PC. L'adresse de l'invité est effa
 
 | Problème | Solutions |
 |---|---|
-| « Pilote Canon introuvable » | Copiez `EDSDK.dll` et `EdsImage.dll` (version 32 bits du SDK Canon) dans `C:\Users\<nom>\LibreBooth\Pilotes`, puis relancez LibreBooth. |
+| « Pilote Canon introuvable » | Admin › Appareil photo › « Ajouter le SDK Canon… », puis choisissez le zip du SDK téléchargé chez Canon. |
 | « Aucun appareil Canon détecté » | Appareil allumé, branché directement sur le PC (sans hub), Wi-Fi de l'appareil coupé, EOS Utility fermé. |
 | Photos trop sombres | Passez l'appareil en M et réglez vitesse, ouverture et ISO sur la lumière du booth. |
 | La photo n'est pas prise | Objectif en MF, qualité en JPEG (pas RAW seul). |
-| Aucune imprimante DNP | Installez le pilote Windows de la DNP (site de DNP), branchez-la en USB et allumez-la. |
+| Aucune imprimante DNP | Relancez le programme d'installation avec la case du pilote cochée (ou installez-le depuis le site de DNP), puis branchez la DNP en USB et allumez-la. |
 | Marque-pages non coupés | Admin › Impression › « Réglages automatiques DNP », puis une page de test. |
 | Autre chose | Menu Démarrer › LibreBooth › « Vérifier l'installation de LibreBooth », puis le journal (admin › Journal). |
 
@@ -213,7 +217,8 @@ LibreBooth est publié sous **licence MIT** : © 2026 Loïs Gonçalves (voir [`L
 libres utilisés sont listés dans [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
 
 Le SDK Canon EDSDK, l'API d'état DNP et le pilote de la DS620 appartiennent à leurs fabricants et ne sont pas
-distribués avec LibreBooth. Canon, EOS et DNP sont des marques de leurs propriétaires ; LibreBooth n'est ni affilié
-à ces sociétés, ni approuvé par elles.
+distribués avec LibreBooth : le programme d'installation télécharge le pilote de la DS620 sur le site de DNP, et
+c'est vous qui téléchargez le SDK chez Canon. Canon, EOS et DNP sont des marques de leurs propriétaires ;
+LibreBooth n'est ni affilié à ces sociétés, ni approuvé par elles.
 
 Historique des versions : [`CHANGELOG.md`](CHANGELOG.md).

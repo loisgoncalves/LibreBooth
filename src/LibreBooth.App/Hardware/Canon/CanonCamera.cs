@@ -109,7 +109,7 @@ internal sealed class CanonCamera : ICamera
         {
             _log.Error(ex, "EDSDK.dll introuvable");
             SetState(CameraState.Error,
-                $"Pilote Canon introuvable : copiez EDSDK.dll et EdsImage.dll (SDK Canon EDSDK, version 32 bits) dans {NativeDrivers.UserFolder}, puis relancez LibreBooth.");
+                "Pilote Canon introuvable : ajoutez le SDK Canon (admin › Appareil photo › « Ajouter le SDK Canon… »).");
         }
         catch (BadImageFormatException ex)
         {

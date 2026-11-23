@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Win32;
 
@@ -13,6 +16,8 @@ internal sealed class InstallOptions
 {
     public string InstallDir { get; set; } = Installation.DefaultInstallDir;
     public bool InstallDriver { get; set; } = true;
+    /// <summary>Version publique : le pilote de la DS620 est téléchargé sur le site de DNP pendant l'installation.</summary>
+    public bool DownloadDriver { get; set; }
     public bool DesktopShortcut { get; set; } = true;
 
     /// <summary>Essai sans droits d'administrateur : ni registre, ni pilote ; raccourcis dans un sous-dossier.</summary>
@@ -35,6 +40,15 @@ internal static class Installation
     private const string DiagnosticShortcut = "Diagnostic du matériel LibreBooth.lnk";
     private const string UninstallShortcut = "Désinstaller LibreBooth.lnk";
     private const string VerifyShortcut = "Vérifier l'installation de LibreBooth.lnk";
+    /// <summary>
+    /// Pilote Windows 11 officiel de la DS620, sur le serveur de DNP (lien de la page Téléchargements de dnpphoto.eu).
+    /// La version publique de LibreBooth ne le contient pas : elle le télécharge et vérifie son empreinte SHA-256.
+    /// </summary>
+    public const string DnpDriverUrl = "https://dnp-newprod-wp-content.cellar-c2.services.clever-cloud.com/uploads/2025/08/Win_11_DP-DS620_Driver-1-3.zip";
+    public const string DnpDriverSha256 = "414f663aede353928e14c898aaacf4157aae7cfd02bdda42639d3a2480779c06";
+    public const string DnpDownloadsPage = "https://dnpphoto.eu/downloads/";
+    private const string DnpPackagePrefix = "DP-DS620_Driver/11/DriverPackage/";
+
     /// <summary>Auteur de LibreBooth, affiché comme éditeur dans Windows (Paramètres › Applications).</summary>
     public const string Author = "Loïs Gonçalves";
 
@@ -95,10 +109,12 @@ internal static class Installation
 
     // ================================================================ Installation
 
-    public static void Install(Payload payload, InstallOptions options, Action<int, string> progress)
+    /// <returns>Les problèmes qui n'empêchent pas LibreBooth de s'installer (pilote DNP non téléchargé…).</returns>
+    public static List<string> Install(Payload payload, InstallOptions options, Action<int, string> progress)
     {
         var dir = options.InstallDir;
-        Log($"Installation de LibreBooth {Version} dans {dir} (pilote : {options.InstallDriver}, bureau : {options.DesktopShortcut}, essai : {options.TestMode})");
+        var warnings = new List<string>();
+        Log($"Installation de LibreBooth {Version} dans {dir} (pilote : {options.InstallDriver}, pilote à télécharger : {options.DownloadDriver}, bureau : {options.DesktopShortcut}, essai : {options.TestMode})");
         Directory.CreateDirectory(dir);
 
         progress(2, "Suppression de l'ancienne version…");
@@ -153,8 +169,21 @@ internal static class Installation
             progress(88, "Installation du pilote de l'imprimante DNP DS620…");
             InstallDriver(payload);
         }
+        else if (options.DownloadDriver && !options.TestMode)
+        {
+            try
+            {
+                DownloadAndInstallDriver(progress);
+            }
+            catch (Exception ex)
+            {
+                Log("Pilote DNP non installé : " + ex);
+                warnings.Add($"Le pilote de la DS620 n'a pas pu être installé ({ex.Message}). Installez-le depuis la page Téléchargements de DNP : {DnpDownloadsPage}");
+            }
+        }
         progress(100, "Installation terminée.");
         Log("Installation terminée");
+        return warnings;
     }
 
     private static void RegisterUninstall(string dir, string uninstaller, string exe, List<string> installed)
@@ -173,50 +202,121 @@ internal static class Installation
         key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
     }
 
-    /// <summary>Installe le pilote DNP avec l'outil fourni par DNP (dpinst64), sans ses pages d'assistant.</summary>
+    /// <summary>Installe le pilote DNP fourni dans la version privée (dossier PiloteDNP du contenu).</summary>
     private static void InstallDriver(Payload payload)
     {
         var temp = Path.Combine(Path.GetTempPath(), "LibreBooth-pilote-DNP-" + Guid.NewGuid().ToString("N").Substring(0, 8));
         try
         {
-            foreach (var entry in payload.Archive.Entries)
-            {
-                var name = Normalize(entry.FullName);
-                if (!name.StartsWith(Payload.DriverFolder, StringComparison.Ordinal) || name.EndsWith("/", StringComparison.Ordinal)) continue;
-                var destination = SafeCombine(temp, name.Substring(Payload.DriverFolder.Length));
-                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                using var input = entry.Open();
-                using var output = new FileStream(destination, FileMode.Create, FileAccess.Write);
-                input.CopyTo(output);
-            }
-
-            var installer = Path.Combine(temp, "dpinst64.exe");
-            if (!File.Exists(installer)) throw new FileNotFoundException("Programme d'installation du pilote DNP introuvable.");
-            using var process = Process.Start(new ProcessStartInfo(installer, "/SW")
-            {
-                WorkingDirectory = temp,
-                UseShellExecute = false,
-            }) ?? throw new InvalidOperationException("Le programme d'installation du pilote DNP n'a pas démarré.");
-            process.WaitForExit();
-
-            // Code de retour de dpinst : 0xWWXXYYZZ (WW : 0x40 = échec, XX : paquets en échec,
-            // YY : paquets copiés dans le magasin de pilotes, ZZ : paquets installés sur un appareil branché).
-            var code = (uint)process.ExitCode;
-            var failed = (code & 0x40000000) != 0 || ((code >> 16) & 0xFF) > 0;
-            Log($"dpinst64 : code 0x{code:X8}");
-            if (failed) throw new InvalidOperationException($"Le pilote DNP n'a pas pu être installé (code 0x{code:X8}).");
+            Extract(payload.Archive, Payload.DriverFolder, temp);
+            RunDriverPackage(temp);
         }
         finally
         {
-            try
-            {
-                Directory.Delete(temp, recursive: true);
-            }
-            catch
-            {
-                // Dossier temporaire : Windows le nettoiera.
-            }
+            TryDeleteFolderTree(temp);
         }
+    }
+
+    /// <summary>Version publique : télécharge le pilote officiel chez DNP, vérifie son empreinte, puis l'installe.</summary>
+    private static void DownloadAndInstallDriver(Action<int, string> progress)
+    {
+        var temp = Path.Combine(Path.GetTempPath(), "LibreBooth-pilote-DNP-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        try
+        {
+            progress(86, "Téléchargement du pilote de la DS620 sur le site de DNP (26 Mo)…");
+            var package = DownloadDriverPackage(temp);
+            progress(92, "Installation du pilote de l'imprimante DNP DS620…");
+            RunDriverPackage(package);
+        }
+        finally
+        {
+            TryDeleteFolderTree(temp);
+        }
+    }
+
+    /// <summary>Télécharge le pilote officiel de DNP dans le dossier indiqué, vérifie son empreinte et décompresse son paquet.</summary>
+    /// <returns>Le dossier du paquet de pilote (avec dpinst64.exe).</returns>
+    public static string DownloadDriverPackage(string folder)
+    {
+        Directory.CreateDirectory(folder);
+        var zipPath = Path.Combine(folder, "pilote-ds620.zip");
+        ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+        var request = (HttpWebRequest)WebRequest.Create(DnpDriverUrl);
+        request.Timeout = 60000;
+        request.ReadWriteTimeout = 120000;
+        request.UserAgent = "LibreBooth-Installation";
+        using (var response = (HttpWebResponse)request.GetResponse())
+        using (var input = response.GetResponseStream())
+        using (var output = File.Create(zipPath))
+        {
+            input.CopyTo(output);
+        }
+
+        string hash;
+        using (var sha = SHA256.Create())
+        using (var stream = File.OpenRead(zipPath))
+        {
+            hash = BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant();
+        }
+        Log($"Pilote DNP téléchargé : {new FileInfo(zipPath).Length} octets, SHA-256 {hash}");
+        if (!string.Equals(hash, DnpDriverSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException("le fichier reçu de DNP n'est pas celui attendu (empreinte différente)");
+        }
+
+        var package = Path.Combine(folder, "DriverPackage");
+        using (var stream = File.OpenRead(zipPath))
+        using (var zip = new ZipArchive(stream, ZipArchiveMode.Read))
+        {
+            Extract(zip, DnpPackagePrefix, package);
+        }
+        return package;
+    }
+
+    private static void Extract(ZipArchive zip, string prefix, string target)
+    {
+        foreach (var entry in zip.Entries)
+        {
+            var name = Normalize(entry.FullName);
+            if (!name.StartsWith(prefix, StringComparison.Ordinal) || name.EndsWith("/", StringComparison.Ordinal)) continue;
+            var destination = SafeCombine(target, name.Substring(prefix.Length));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            using var input = entry.Open();
+            using var output = new FileStream(destination, FileMode.Create, FileAccess.Write);
+            input.CopyTo(output);
+        }
+    }
+
+    private static void TryDeleteFolderTree(string folder)
+    {
+        try
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+        }
+        catch
+        {
+            // Dossier temporaire : Windows le nettoiera.
+        }
+    }
+
+    /// <summary>Installe un paquet de pilote DNP avec l'outil fourni par DNP (dpinst64), sans ses pages d'assistant.</summary>
+    private static void RunDriverPackage(string temp)
+    {
+        var installer = Path.Combine(temp, "dpinst64.exe");
+        if (!File.Exists(installer)) throw new FileNotFoundException("Programme d'installation du pilote DNP introuvable.");
+        using var process = Process.Start(new ProcessStartInfo(installer, "/SW")
+        {
+            WorkingDirectory = temp,
+            UseShellExecute = false,
+        }) ?? throw new InvalidOperationException("Le programme d'installation du pilote DNP n'a pas démarré.");
+        process.WaitForExit();
+
+        // Code de retour de dpinst : 0xWWXXYYZZ (WW : 0x40 = échec, XX : paquets en échec,
+        // YY : paquets copiés dans le magasin de pilotes, ZZ : paquets installés sur un appareil branché).
+        var code = (uint)process.ExitCode;
+        var failed = (code & 0x40000000) != 0 || ((code >> 16) & 0xFF) > 0;
+        Log($"dpinst64 : code 0x{code:X8}");
+        if (failed) throw new InvalidOperationException($"Le pilote DNP n'a pas pu être installé (code 0x{code:X8}).");
     }
 
     // ================================================================ Désinstallation
@@ -230,6 +330,8 @@ internal static class Installation
         TryDelete(Path.Combine(DesktopFolder(testMode, dir), AppShortcut));
 
         RemoveListedFiles(dir);
+        // Fichiers des fabricants ajoutés après l'installation (SDK Canon…) : gardés lors des mises à jour, retirés ici.
+        foreach (var file in CanonSdk.Files.Concat(new[] { "cspstat.dll" })) TryDelete(Path.Combine(dir, file));
         RemoveEmptyFolders(dir);
 
         // Lancement au démarrage de Windows (réglé dans l'admin de LibreBooth), s'il pointe vers ce dossier.

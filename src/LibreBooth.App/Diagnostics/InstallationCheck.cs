@@ -83,8 +83,9 @@ public static class InstallationCheck
                 "Relancez le programme d'installation de LibreBooth pour remettre les fichiers manquants."));
 
         report(DriverFile("Pilote de l'appareil Canon (SDK EDSDK)", NativeDrivers.CanonFiles, CheckStatus.Error,
-            "Téléchargez le SDK Canon EDSDK (gratuit, sur inscription au programme développeurs de Canon) et copiez EDSDK.dll et "
-            + $"EdsImage.dll de sa version 32 bits dans {NativeDrivers.UserFolder}, puis relancez LibreBooth."));
+            $"Téléchargez le SDK Canon EDSDK pour Windows (gratuit, sur inscription chez Canon : {CanonSdkImport.Page}), puis "
+            + "ajoutez-le avec le bouton « Ajouter le SDK Canon… » (ici, ou dans l'admin › Appareil photo) : LibreBooth "
+            + "en extrait lui-même les bons fichiers."));
         report(DriverFile("Lecture de l'état de la DNP", new[] { NativeDrivers.DnpStatusFile }, CheckStatus.Info,
             $"Facultatif : si vous avez cspstat.dll (API d'état des imprimantes DNP), copiez-la dans {NativeDrivers.UserFolder}. "
             + "Sans elle, LibreBooth compte lui-même ses tirages."));
@@ -377,8 +378,11 @@ public static class InstallationCheck
         }
         else
         {
+            var sdkMissing = NativeDrivers.CanonFiles.Any(f => NativeDrivers.Find(f) == null);
             report(new CheckResult(CameraCategory, "Appareil Canon", CheckStatus.Warning, canon.StatusMessage,
-                "Branchez l'appareil en USB (sans hub) et allumez-le ; Wi-Fi de l'appareil coupé, EOS Utility fermé."));
+                sdkMissing
+                    ? "Ajoutez d'abord le SDK Canon (voir « Pilote de l'appareil Canon » plus haut)."
+                    : "Branchez l'appareil en USB (sans hub) et allumez-le ; Wi-Fi de l'appareil coupé, EOS Utility fermé."));
         }
     }
 

@@ -178,6 +178,17 @@
                             </StackPanel>
                         </GroupBox>
 
+                        <GroupBox Header="SDK Canon (pilote de l'appareil photo)">
+                            <StackPanel>
+                                <TextBlock x:Name="CanonSdkText" Style="{StaticResource Value}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock x:Name="CanonSdkHelp" Style="{StaticResource Help}" TextWrapping="Wrap" />
+                                <WrapPanel Margin="0,4,0,0">
+                                    <Button Content="1. Ouvrir la page Canon" Click="OpenCanonPage_Click" />
+                                    <Button x:Name="ImportCanonSdkButton" Content="2. Ajouter le SDK Canon…" Click="ImportCanonSdk_Click" />
+                                </WrapPanel>
+                            </StackPanel>
+                        </GroupBox>
+
                         <GroupBox Header="Essai">
                             <StackPanel>
                                 <WrapPanel>

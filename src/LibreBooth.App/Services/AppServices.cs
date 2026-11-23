@@ -1,5 +1,6 @@
 using System.Net.NetworkInformation;
 using System.Windows.Threading;
+using LibreBooth.App.Hardware;
 using LibreBooth.App.Hardware.Canon;
 using LibreBooth.App.Hardware.Demo;
 using LibreBooth.App.Hardware.Printing;
@@ -98,6 +99,30 @@ public sealed class AppServices : IDisposable
         Options.Demo || Settings.Camera.Kind == CameraKind.Demo
             ? new DemoCamera()
             : new CanonCamera(() => Settings.Camera);
+
+    /// <summary>
+    /// Ajoute le SDK Canon (zip téléchargé chez Canon) dans le dossier « Pilotes ». Renvoie la version d'EDSDK.dll.
+    /// Peut tourner hors du fil de l'interface ; appeler ensuite <see cref="RestartCamera"/> pour l'utiliser tout de suite.
+    /// </summary>
+    public string ImportCanonSdk(string source)
+    {
+        var version = CanonSdkImport.Import(source, NativeDrivers.UserFolder);
+        _log.Information("SDK Canon ajouté dans {Folder} (EDSDK {Version})", NativeDrivers.UserFolder, version);
+        NativeDrivers.Refresh();
+        return version;
+    }
+
+    /// <summary>Relance l'appareil Canon (après l'ajout du SDK), sans redémarrer LibreBooth. Sur le fil de l'interface.</summary>
+    public void RestartCamera()
+    {
+        if (Camera is DemoCamera) return;
+        // Le SDK Canon est commun à tout le programme : l'ancien appareil le libère avant que le nouveau ne le démarre.
+        Camera.Dispose();
+        Camera = CreateCamera();
+        _log.Information("Appareil photo relancé : {Camera}", Camera.Name);
+        Camera.Start();
+        CameraChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     /// <summary>Remplace l'appareil si le type choisi dans l'admin a changé (Canon ↔ démo).</summary>
     public void SwitchCameraIfNeeded()

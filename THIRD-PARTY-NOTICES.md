@@ -17,10 +17,14 @@ Pour les tests seulement (non distribués) : xUnit (Apache 2.0), Microsoft.NET.T
 ## Non inclus
 
 Ces fichiers appartiennent à leurs fabricants et **ne sont ni dans ce dépôt ni dans les versions publiées**.
-Chaque utilisateur se les procure lui-même (voir le README) :
+Chaque utilisateur se les procure lui-même, à la source (voir le README) :
 
-- **SDK Canon EDSDK** (`EDSDK.dll`, `EdsImage.dll`) : © Canon Inc., fourni par le programme développeurs de Canon ;
-- **API d'état DNP** (`cspstat.dll`) et **pilote Windows de la DS620** : © Dai Nippon Printing / DNP Imagingcomm.
+- **SDK Canon EDSDK** (`EDSDK.dll`, `EdsImage.dll`) : © Canon Inc., fourni par le programme développeurs de Canon.
+  L'utilisateur le télécharge chez Canon ; LibreBooth ne fait qu'en extraire les deux fichiers dont il a besoin, sur
+  son PC ;
+- **pilote Windows de la DS620** : © Dai Nippon Printing / DNP Imagingcomm. Le programme d'installation le
+  télécharge sur le serveur de DNP au moment de l'installation et vérifie son empreinte ; il n'est pas redistribué ;
+- **API d'état DNP** (`cspstat.dll`) : © Dai Nippon Printing / DNP Imagingcomm.
 
 Canon, EOS, DNP et les noms de produits cités sont des marques de leurs propriétaires. LibreBooth n'est ni
 affilié à ces sociétés, ni approuvé par elles.

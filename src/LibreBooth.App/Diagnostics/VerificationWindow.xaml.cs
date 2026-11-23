@@ -3,8 +3,11 @@ using System.Diagnostics;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Media;
+using LibreBooth.App.Admin;
+using LibreBooth.App.Hardware;
 using LibreBooth.App.Services;
 using LibreBooth.Core.Config;
+using LibreBooth.Core.Hardware;
 using Microsoft.Win32;
 using Serilog;
 
@@ -52,6 +55,7 @@ public partial class VerificationWindow : Window
         _run?.Cancel();
         var run = _run = new CancellationTokenSource();
         _results.Clear();
+        CanonSdkBanner.Visibility = NativeDrivers.CanonFiles.All(f => NativeDrivers.Find(f) != null) ? Visibility.Collapsed : Visibility.Visible;
         BusyBar.Visibility = Visibility.Visible;
         RerunButton.IsEnabled = false;
         SummaryText.Text = "Vérification en cours…";
@@ -97,6 +101,50 @@ public partial class VerificationWindow : Window
     }
 
     private async void Rerun_Click(object sender, RoutedEventArgs e) => await RunAsync();
+
+    private void OpenCanonPage_Click(object sender, RoutedEventArgs e) => AdminWindow.OpenInBrowser(CanonSdkImport.Page);
+
+    /// <summary>Le zip du SDK téléchargé chez Canon : EDSDK.dll et EdsImage.dll (32 bits) vont dans le dossier « Pilotes ».</summary>
+    private async void ImportCanonSdk_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "SDK Canon EDSDK téléchargé (fichier zip)",
+            Filter = "SDK Canon (*.zip ; EDSDK.dll)|*.zip;EDSDK.dll|Tous les fichiers|*.*",
+            InitialDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        CanonSdkImportButton.IsEnabled = false;
+        try
+        {
+            var source = dialog.FileName;
+            string version;
+            if (_services != null)
+            {
+                version = await Task.Run(() => _services.ImportCanonSdk(source));
+                _services.RestartCamera();
+            }
+            else
+            {
+                version = await Task.Run(() => CanonSdkImport.Import(source, NativeDrivers.UserFolder));
+                NativeDrivers.Refresh();
+                _log.Information("SDK Canon ajouté dans {Folder} (EDSDK {Version})", NativeDrivers.UserFolder, version);
+            }
+            MessageBox.Show(this, $"SDK Canon ajouté (EDSDK {version}). La vérification va être relancée.", "LibreBooth",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            await RunAsync();
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "SDK Canon non ajouté");
+            MessageBox.Show(this, "Ce fichier ne convient pas : " + ex.Message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            CanonSdkImportButton.IsEnabled = true;
+        }
+    }
 
     private void SaveReport_Click(object sender, RoutedEventArgs e)
     {

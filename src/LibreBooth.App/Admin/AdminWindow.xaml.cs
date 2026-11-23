@@ -1,11 +1,13 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using LibreBooth.App.Hardware;
 using LibreBooth.App.Hardware.Printing;
 using LibreBooth.App.Infrastructure;
 using LibreBooth.App.Kiosk;
@@ -299,6 +301,80 @@ public partial class AdminWindow : Window
         CameraModeHelp.Text = _services.Options.Demo
             ? "LibreBooth a été lancé avec --demo : l'appareil de démonstration est utilisé quel que soit ce choix."
             : "Le changement est immédiat. L'appareil Canon se reconnecte tout seul s'il est débranché puis rebranché.";
+        UpdateCanonSdkTexts();
+    }
+
+    /// <summary>Le SDK Canon ne peut pas être livré avec LibreBooth : on indique s'il est là, et comment l'ajouter.</summary>
+    private void UpdateCanonSdkTexts()
+    {
+        var missing = NativeDrivers.CanonFiles.Where(f => NativeDrivers.Find(f) == null).ToList();
+        if (missing.Count == 0)
+        {
+            var path = NativeDrivers.Find(NativeDrivers.CanonFiles[0])!;
+            var version = FileVersionInfo.GetVersionInfo(path).FileVersion;
+            CanonSdkText.Text = $"✓ SDK Canon présent (EDSDK {version}) : {Path.GetDirectoryName(path)}";
+            CanonSdkText.Foreground = new SolidColorBrush(Color.FromRgb(0x1E, 0x7B, 0x34));
+            CanonSdkHelp.Text = "Pour passer à une version plus récente du SDK, téléchargez-la chez Canon puis ajoutez-la avec le bouton 2.";
+            ImportCanonSdkButton.Content = "2. Remplacer le SDK Canon…";
+        }
+        else
+        {
+            CanonSdkText.Text = "SDK Canon manquant : sans lui, LibreBooth ne peut pas piloter l'appareil photo.";
+            CanonSdkText.Foreground = new SolidColorBrush(Color.FromRgb(0xA4, 0x26, 0x2C));
+            CanonSdkHelp.Text = "Il appartient à Canon et ne peut pas être fourni avec LibreBooth. 1. Ouvrez la page Canon, "
+                                + "inscrivez-vous (gratuit) et téléchargez le SDK « EDSDK » pour Windows. 2. Indiquez le fichier "
+                                + "zip téléchargé : LibreBooth en extrait lui-même les bons fichiers (version 32 bits).";
+            ImportCanonSdkButton.Content = "2. Ajouter le SDK Canon…";
+        }
+    }
+
+    private void OpenCanonPage_Click(object sender, RoutedEventArgs e) => OpenInBrowser(CanonSdkImport.Page);
+
+    private async void ImportCanonSdk_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "SDK Canon EDSDK téléchargé (fichier zip)",
+            Filter = "SDK Canon (*.zip ; EDSDK.dll)|*.zip;EDSDK.dll|Tous les fichiers|*.*",
+            InitialDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        ImportCanonSdkButton.IsEnabled = false;
+        try
+        {
+            var source = dialog.FileName;
+            var version = await Task.Run(() => _services.ImportCanonSdk(source));
+            StopLiveTest();
+            _services.RestartCamera();
+            UpdateCanonSdkTexts();
+            RefreshLiveStatus();
+            MessageBox.Show(this, $"SDK Canon ajouté (EDSDK {version}).\n\nBranchez l'appareil photo en USB et allumez-le : "
+                                  + "LibreBooth s'y connecte tout seul.", "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "SDK Canon non ajouté");
+            ShowError("Ce fichier ne convient pas : " + ex.Message);
+        }
+        finally
+        {
+            ImportCanonSdkButton.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Page web dans le navigateur habituel.</summary>
+    internal static void OpenInBrowser(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Page impossible à ouvrir : {Url}", url);
+            MessageBox.Show($"Ouvrez cette adresse dans votre navigateur :\n{url}", "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
     }
 
     private void CameraKind_Changed(object sender, RoutedEventArgs e)

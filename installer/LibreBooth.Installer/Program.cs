@@ -32,6 +32,9 @@ internal static class Program
         try
         {
             if (preview != null) return SavePreview(preview);
+            // Essai du téléchargement du pilote DNP (empreinte et décompression), sans rien installer.
+            var driverTest = ValueOf(args, "/test-pilote-dnp");
+            if (driverTest != null) return TestDriverDownload(driverTest);
             if (!test && !IsAdministrator()) return RestartAsAdministrator(args);
             var executable = Process.GetCurrentProcess().MainModule!.FileName;
             return uninstall ? RunUninstall(executable, silent, test) : RunInstall(executable, silent, test, folder);
@@ -57,6 +60,7 @@ internal static class Program
         {
             InstallDir = Installation.NormalizeInstallDir(folder ?? Installation.DefaultInstallDir),
             InstallDriver = !test && payload.HasDriver && !Installation.IsDriverInstalled(),
+            DownloadDriver = !test && !payload.HasDriver && !Installation.IsDriverInstalled(),
             DesktopShortcut = true,
             TestMode = test,
         };
@@ -129,6 +133,23 @@ internal static class Program
     {
         using var identity = WindowsIdentity.GetCurrent();
         return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+    }
+
+    /// <summary>Essai du téléchargement du pilote DNP : empreinte et décompression, sans rien installer.</summary>
+    private static int TestDriverDownload(string folder)
+    {
+        try
+        {
+            var package = Installation.DownloadDriverPackage(folder);
+            var ok = File.Exists(Path.Combine(package, "dpinst64.exe"));
+            Installation.Log($"Essai du pilote DNP : {(ok ? "téléchargé, vérifié et décompressé" : "dpinst64.exe absent")} dans {package}");
+            return ok ? 0 : 2;
+        }
+        catch (Exception ex)
+        {
+            Installation.Log("Essai du pilote DNP : échec – " + ex.Message);
+            return 1;
+        }
     }
 
     /// <summary>Relance le programme avec les droits d'administrateur (Windows demande la permission).</summary>
