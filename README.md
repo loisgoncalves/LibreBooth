@@ -1,4 +1,9 @@
-<p align="center"><img src="assets/logo-librebooth.png" alt="LibreBooth" width="280"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-librebooth-sombre.png">
+    <img src="assets/logo-librebooth.png" alt="LibreBooth" width="280">
+  </picture>
+</p>
 
 # LibreBooth
 
