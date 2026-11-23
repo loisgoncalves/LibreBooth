@@ -1,3 +1,4 @@
+using LibreBooth.Core.Events;
 using LibreBooth.Core.Layouts;
 using LibreBooth.Core.Util;
 using Serilog;
@@ -9,8 +10,8 @@ namespace LibreBooth.Core.Design;
 public sealed record BackgroundImport(string FileName, int SourceWidth, int SourceHeight, bool Cropped);
 
 /// <summary>
-/// Personnalisation d'un événement, rangée dans son dossier :
-/// Evenements\&lt;événement&gt;\personnalisation\ (personnalisation.json, fonds, logo, aperçus).
+/// Personnalisation d'un événement, rangée dans son dossier caché :
+/// Evenements\&lt;événement&gt;\.librebooth\personnalisation\ (personnalisation.json, fonds, logo, aperçus).
 /// </summary>
 public static class CustomizationStore
 {
@@ -26,7 +27,7 @@ public static class CustomizationStore
 
     private static readonly ILogger Logger = Log.ForContext(typeof(CustomizationStore));
 
-    public static string FolderFor(string eventFolder) => Path.Combine(eventFolder, FolderName);
+    public static string FolderFor(string eventFolder) => Path.Combine(BoothEvent.DataFolderFor(eventFolder), FolderName);
 
     public static string PreviewsFolderFor(string eventFolder) => Path.Combine(FolderFor(eventFolder), PreviewsFolderName);
 

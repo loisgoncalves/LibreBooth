@@ -44,7 +44,14 @@ public static class TemplatePreview
     private static string GetOrCreateForEvent(LayoutCompositor compositor, Template template, PreviewContext context, int maxSide)
     {
         var key = CacheKey(template, context, maxSide);
-        var preview = Path.Combine(context.CacheFolder, $"{template.Id}-{key}.jpg");
+        var cacheFolder = context.CacheFolder;
+        // Événement renommé pendant la préparation (son dossier a changé de nom) : on ne recrée pas l'ancien dossier.
+        var eventData = Path.GetDirectoryName(Path.GetDirectoryName(Path.GetFullPath(cacheFolder).TrimEnd(Path.DirectorySeparatorChar)));
+        if (!Directory.Exists(cacheFolder) && eventData != null && !Directory.Exists(eventData))
+        {
+            cacheFolder = Path.Combine(Path.GetTempPath(), "LibreBooth-apercus");
+        }
+        var preview = Path.Combine(cacheFolder, $"{template.Id}-{key}.jpg");
         if (File.Exists(preview)) return preview;
 
         using (var image = ComposeSample(compositor, template, context.EventName, context.Design, context.EventDate))
@@ -53,7 +60,7 @@ public static class TemplatePreview
         }
 
         // Les anciens aperçus de ce modèle ne servent plus.
-        foreach (var old in Directory.GetFiles(context.CacheFolder, template.Id + "-*.jpg"))
+        foreach (var old in Directory.GetFiles(cacheFolder, template.Id + "-*.jpg"))
         {
             if (!string.Equals(old, preview, StringComparison.OrdinalIgnoreCase)) AtomicFile.TryDelete(old);
         }

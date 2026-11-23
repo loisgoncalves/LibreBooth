@@ -10,7 +10,6 @@ public enum KioskState
     Shooting,
     Processing,
     Review,
-    Email,
     Thanks,
     Error,
 }
@@ -72,11 +71,7 @@ public sealed class SessionStateMachine
         return Go(KioskState.Shooting);
     }
 
-    public bool OpenEmail() => State == KioskState.Review && Go(KioskState.Email);
-
-    public bool CloseEmail() => State == KioskState.Email && Go(KioskState.Review);
-
-    public bool Finish() => (State is KioskState.Review or KioskState.Email) && Go(KioskState.Thanks);
+    public bool Finish() => State == KioskState.Review && Go(KioskState.Thanks);
 
     public bool Fail(string message)
     {
@@ -97,7 +92,6 @@ public sealed class SessionStateMachine
     {
         KioskState.ChooseTemplate => Reset(),
         KioskState.Review => Go(KioskState.Thanks),
-        KioskState.Email => Go(KioskState.Review),
         KioskState.Thanks => Reset(),
         KioskState.Error => Reset(),
         _ => false,
@@ -108,7 +102,6 @@ public sealed class SessionStateMachine
     {
         KioskState.ChooseTemplate => TimeSpan.FromSeconds(screens.ChooseTimeoutSeconds),
         KioskState.Review => TimeSpan.FromSeconds(screens.ReviewTimeoutSeconds),
-        KioskState.Email => TimeSpan.FromSeconds(screens.EmailTimeoutSeconds),
         KioskState.Thanks => TimeSpan.FromSeconds(screens.ThanksSeconds),
         KioskState.Error => TimeSpan.FromSeconds(screens.ErrorSeconds),
         _ => null,

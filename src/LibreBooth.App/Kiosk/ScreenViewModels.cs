@@ -5,7 +5,6 @@ using CommunityToolkit.Mvvm.Input;
 using LibreBooth.Core.Design;
 using LibreBooth.Core.Events;
 using LibreBooth.Core.Layouts;
-using LibreBooth.Core.Sharing;
 
 namespace LibreBooth.App.Kiosk;
 
@@ -28,7 +27,6 @@ public sealed class SessionData
     public List<string> Photos { get; } = new();
     public string? CompositePath { get; set; }
     public int PrintedCopies { get; set; }
-    public int EmailCount { get; set; }
     /// <summary>Nombre de séries déjà refusées par l'invité (bouton « Recommencer ») avant celle-ci.</summary>
     public int RetakeCount { get; init; }
 }
@@ -185,10 +183,9 @@ public partial class ReviewViewModel : ObservableObject
     private bool _isPrinting;
 
     [ObservableProperty] private string? _printHint;
-    [ObservableProperty] private bool _showEmailButton;
     [ObservableProperty] private string? _statusMessage;
 
-    /// <summary>« Recommencer » : tant que l'invité n'a ni imprimé ni demandé d'e-mail, dans la limite fixée dans l'admin.</summary>
+    /// <summary>« Recommencer » : tant que l'invité n'a rien imprimé, dans la limite fixée dans l'admin.</summary>
     [ObservableProperty] private bool _showRetakeButton;
 
     [RelayCommand]
@@ -210,95 +207,7 @@ public partial class ReviewViewModel : ObservableObject
     private bool CanPrintNow() => CanPrint && !IsPrinting;
 
     [RelayCommand]
-    private void Email() => _kiosk.OpenEmail();
-
-    [RelayCommand]
     private void Finish() => _kiosk.Finish();
-}
-
-public partial class EmailViewModel : ObservableObject
-{
-    private readonly KioskViewModel _kiosk;
-
-    public EmailViewModel(KioskViewModel kiosk)
-    {
-        _kiosk = kiosk;
-    }
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsValid))]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    private string _address = "";
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsValid))]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    private bool _consentChecked;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsValid))]
-    [NotifyCanExecuteChangedFor(nameof(SendCommand))]
-    private bool _requireConsent;
-
-    [ObservableProperty] private string _consentText = "";
-    [ObservableProperty] private string? _suggestion;
-
-    public IReadOnlyList<string> Domains { get; } = new[]
-    {
-        "@gmail.com", "@hotmail.fr", "@orange.fr", "@yahoo.fr", "@outlook.fr", "@icloud.com", "@free.fr", "@sfr.fr",
-    };
-
-    public bool IsValid => EmailValidator.IsValid(Address) && (!RequireConsent || ConsentChecked);
-
-    public void Reset(bool requireConsent, string consentText)
-    {
-        Address = "";
-        ConsentChecked = false;
-        RequireConsent = requireConsent;
-        ConsentText = consentText;
-        Suggestion = null;
-    }
-
-    partial void OnAddressChanged(string value) => Suggestion = EmailValidator.Suggest(value);
-
-    /// <summary>Touche du clavier tactile (ou du clavier physique).</summary>
-    [RelayCommand]
-    private void Key(string? key)
-    {
-        if (string.IsNullOrEmpty(key)) return;
-        switch (key)
-        {
-            case "BACK":
-                if (Address.Length > 0) Address = Address[..^1];
-                break;
-            case "CLEAR":
-                Address = "";
-                break;
-            default:
-                if (key.Length > 1 && key.StartsWith('@'))
-                {
-                    var at = Address.IndexOf('@');
-                    Address = (at >= 0 ? Address[..at] : Address) + key;
-                }
-                else if (Address.Length + key.Length <= 100)
-                {
-                    Address += key.ToLowerInvariant();
-                }
-                break;
-        }
-    }
-
-    [RelayCommand]
-    private void ApplySuggestion()
-    {
-        if (Suggestion != null) Address = Suggestion;
-    }
-
-    [RelayCommand(CanExecute = nameof(IsValid))]
-    private void Send() => _kiosk.SubmitEmail(Address.Trim());
-
-    [RelayCommand]
-    private void Back() => _kiosk.CloseEmail();
 }
 
 public partial class ThanksViewModel : ObservableObject

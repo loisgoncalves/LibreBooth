@@ -48,24 +48,7 @@ internal sealed class InstallerForm : Form
         _payload = payload;
         _options = options;
 
-        Text = "Installation de LibreBooth";
-        Font = new Font("Segoe UI", 10f);
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        StartPosition = FormStartPosition.CenterScreen;
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        AutoScaleMode = AutoScaleMode.Dpi;
-        Padding = new Padding(20);
-        BackColor = Color.White;
-        try
-        {
-            Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
-        }
-        catch
-        {
-            // Icône par défaut de Windows.
-        }
+        FormParts.Setup(this, options.Update ? "Mise à jour de LibreBooth" : "Installation de LibreBooth");
 
         var driverInstalled = Installation.IsDriverInstalled();
         var withDriver = payload?.HasDriver == true;
@@ -82,7 +65,56 @@ internal sealed class InstallerForm : Form
         _verifyExistingButton.Visible = Installation.VerifyShortcutPath(options.TestMode, options.InstallDir) != null;
 
         var layout = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Fill };
-        layout.Controls.Add(Header());
+        if (options.Update)
+        {
+            // Mise à jour lancée depuis l'admin : rien à choisir, elle démarre toute seule.
+            var installed = Installation.InstalledVersion(options.InstallDir);
+            var from = installed != null && installed != Installation.Version ? installed + " → " : "";
+            layout.Controls.Add(FormParts.Header($"Mise à jour de LibreBooth {from}{Installation.Version}"));
+            layout.Controls.Add(FormParts.Paragraph(
+                $"LibreBooth est mis à jour dans {options.InstallDir}. Vos photos, événements et réglages sont gardés, "
+                + "ainsi que les pilotes déjà ajoutés (SDK Canon, imprimante DNP).", bottom: 14));
+            _installButton.Text = "Mettre à jour";
+            Shown += async (_, _) => await InstallOrFinishAsync();
+        }
+        else
+        {
+            AddInstallChoices(layout, withDriver);
+        }
+        layout.Controls.Add(_progress);
+        layout.Controls.Add(_status);
+        layout.Controls.Add(_canonPanel);
+        _canonPanel.Controls.Add(_canonIntro);
+        var canonButtons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        canonButtons.Controls.Add(_canonPageButton);
+        canonButtons.Controls.Add(_canonImportButton);
+        _canonPanel.Controls.Add(canonButtons);
+        _canonPanel.Controls.Add(_canonStatus);
+        layout.Controls.Add(_verifyCheck);
+        layout.Controls.Add(_launchCheck);
+        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Right, Margin = new Padding(0, 14, 0, 0) };
+        buttons.Controls.Add(_cancelButton);
+        buttons.Controls.Add(_installButton);
+        layout.Controls.Add(buttons);
+        Controls.Add(layout);
+
+        AcceptButton = _installButton;
+        CancelButton = _cancelButton;
+        _browseButton.Click += (_, _) => Browse();
+        _installButton.Click += async (_, _) => await InstallOrFinishAsync();
+        _cancelButton.Click += (_, _) => Close();
+        _verifyExistingButton.Click += (_, _) => VerifyExisting();
+        _canonPageButton.Click += (_, _) => OpenInBrowser(CanonSdk.Page);
+        _canonImportButton.Click += (_, _) => ImportCanonSdk();
+        // Vérifier ou lancer LibreBooth : l'un ou l'autre (la vérification propose ensuite de lancer LibreBooth).
+        _verifyCheck.CheckedChanged += (_, _) => { if (_verifyCheck.Checked) _launchCheck.Checked = false; };
+        _launchCheck.CheckedChanged += (_, _) => { if (_launchCheck.Checked) _verifyCheck.Checked = false; };
+    }
+
+    /// <summary>Installation : ce qui va être installé, le dossier, le pilote DNP et le raccourci du Bureau.</summary>
+    private void AddInstallChoices(TableLayoutPanel layout, bool withDriver)
+    {
+        layout.Controls.Add(FormParts.Header($"Installation de LibreBooth {Installation.Version}"));
         layout.Controls.Add(new Label
         {
             Text = withDriver
@@ -115,87 +147,14 @@ internal sealed class InstallerForm : Form
         layout.Controls.Add(_desktopCheck);
         layout.Controls.Add(new Label
         {
-            Text = "Vos photos, événements et réglages (dossier LibreBooth de votre profil, C:\\Users\\<nom>\\LibreBooth) ne sont jamais effacés, ni par une mise à jour, ni par la désinstallation.",
+            Text = "Vos photos, événements et réglages (dossier LibreBooth de votre profil, C:\\Users\\<nom>\\LibreBooth) ne sont jamais effacés par une mise à jour. "
+                   + "À la désinstallation, ils sont gardés, sauf si vous demandez leur suppression.",
             ForeColor = Color.DimGray,
             AutoSize = true,
             MaximumSize = new Size(560, 0),
             Margin = new Padding(0, 12, 0, 8),
         });
         layout.Controls.Add(_verifyExistingButton);
-        layout.Controls.Add(_progress);
-        layout.Controls.Add(_status);
-        layout.Controls.Add(_canonPanel);
-        _canonPanel.Controls.Add(_canonIntro);
-        var canonButtons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
-        canonButtons.Controls.Add(_canonPageButton);
-        canonButtons.Controls.Add(_canonImportButton);
-        _canonPanel.Controls.Add(canonButtons);
-        _canonPanel.Controls.Add(_canonStatus);
-        layout.Controls.Add(_verifyCheck);
-        layout.Controls.Add(_launchCheck);
-        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Right, Margin = new Padding(0, 14, 0, 0) };
-        buttons.Controls.Add(_cancelButton);
-        buttons.Controls.Add(_installButton);
-        layout.Controls.Add(buttons);
-        Controls.Add(layout);
-
-        AcceptButton = _installButton;
-        CancelButton = _cancelButton;
-        _browseButton.Click += (_, _) => Browse();
-        _installButton.Click += async (_, _) => await InstallOrFinishAsync();
-        _cancelButton.Click += (_, _) => Close();
-        _verifyExistingButton.Click += (_, _) => VerifyExisting();
-        _canonPageButton.Click += (_, _) => OpenInBrowser(CanonSdk.Page);
-        _canonImportButton.Click += (_, _) => ImportCanonSdk();
-        // Vérifier ou lancer LibreBooth : l'un ou l'autre (la vérification propose ensuite de lancer LibreBooth).
-        _verifyCheck.CheckedChanged += (_, _) => { if (_verifyCheck.Checked) _launchCheck.Checked = false; };
-        _launchCheck.CheckedChanged += (_, _) => { if (_launchCheck.Checked) _verifyCheck.Checked = false; };
-    }
-
-    /// <summary>Le logo de LibreBooth, le titre et l'auteur.</summary>
-    private Control Header()
-    {
-        var header = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 0, 0, 12) };
-        var logo = LoadLogo();
-        if (logo != null)
-        {
-            header.Controls.Add(new PictureBox
-            {
-                Image = logo,
-                SizeMode = PictureBoxSizeMode.Zoom,
-                Size = new Size(150, (int)Math.Round(150.0 * logo.Height / logo.Width)),
-                Margin = new Padding(0, 0, 18, 0),
-            });
-        }
-        var titles = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Anchor = AnchorStyles.Left };
-        titles.Controls.Add(new Label
-        {
-            Text = $"Installation de LibreBooth {Installation.Version}",
-            Font = new Font("Segoe UI", 15f, FontStyle.Bold),
-            AutoSize = true,
-            Margin = new Padding(0, 18, 0, 4),
-        });
-        titles.Controls.Add(new Label
-        {
-            Text = $"Logiciel de photobooth gratuit · conçu par {Installation.Author}",
-            ForeColor = Color.DimGray,
-            AutoSize = true,
-        });
-        header.Controls.Add(titles);
-        return header;
-    }
-
-    private static Image? LoadLogo()
-    {
-        try
-        {
-            using var stream = typeof(InstallerForm).Assembly.GetManifestResourceStream("LibreBooth.Installer.logo.png");
-            return stream == null ? null : Image.FromStream(stream);
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     private void Browse()
@@ -233,26 +192,41 @@ internal sealed class InstallerForm : Form
             return;
         }
 
-        try
+        if (_options.Update)
         {
-            _options.InstallDir = Installation.NormalizeInstallDir(_folderBox.Text);
+            // LibreBooth se ferme de lui-même juste après avoir lancé la mise à jour.
+            SetEditing(false);
+            _status.Text = "Fermeture de LibreBooth…";
+            await Task.Run(() => Installation.WaitForLibreBoothToClose(TimeSpan.FromSeconds(60)));
         }
-        catch (Exception ex)
+        else
         {
-            MessageBox.Show(this, "Dossier invalide : " + ex.Message, "LibreBooth", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+            try
+            {
+                _options.InstallDir = Installation.NormalizeInstallDir(_folderBox.Text);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Dossier invalide : " + ex.Message, "LibreBooth", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            _folderBox.Text = _options.InstallDir;
+            var withDriver = _payload?.HasDriver == true;
+            _options.InstallDriver = withDriver && _driverCheck.Visible && _driverCheck.Checked;
+            _options.DownloadDriver = !withDriver && _driverCheck.Visible && _driverCheck.Checked;
+            _options.DesktopShortcut = _desktopCheck.Checked;
         }
-        _folderBox.Text = _options.InstallDir;
-        var withDriver = _payload?.HasDriver == true;
-        _options.InstallDriver = withDriver && _driverCheck.Visible && _driverCheck.Checked;
-        _options.DownloadDriver = !withDriver && _driverCheck.Visible && _driverCheck.Checked;
-        _options.DesktopShortcut = _desktopCheck.Checked;
 
         while (Installation.IsLibreBoothRunning())
         {
             var retry = MessageBox.Show(this, "LibreBooth est ouvert. Fermez-le (bouton « Quitter LibreBooth » de l'admin), puis cliquez sur Réessayer.",
                 "LibreBooth", MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning);
-            if (retry != DialogResult.Retry) return;
+            if (retry != DialogResult.Retry)
+            {
+                _status.Text = "";
+                SetEditing(true);
+                return;
+            }
         }
 
         SetEditing(false);
@@ -262,7 +236,9 @@ internal sealed class InstallerForm : Form
             var payload = _payload ?? throw new InvalidOperationException("Ce programme ne contient pas LibreBooth.");
             var warnings = await Task.Run(() => Installation.Install(payload, _options, ReportProgress));
             _done = true;
-            _status.Text = "LibreBooth est installé. Ouvrez-le avec le raccourci « LibreBooth » (Bureau ou menu Démarrer).";
+            _status.Text = _options.Update
+                ? $"LibreBooth est à jour : version {Installation.Version}."
+                : "LibreBooth est installé. Ouvrez-le avec le raccourci « LibreBooth » (Bureau ou menu Démarrer).";
             if ((_options.InstallDriver || _options.DownloadDriver) && warnings.Count == 0)
             {
                 _status.Text += " Branchez la DS620 en USB et allumez-la : Windows l'installe avec son pilote.";
@@ -273,8 +249,10 @@ internal sealed class InstallerForm : Form
                 _status.ForeColor = Color.FromArgb(0x8A, 0x4B, 0x00);
             }
             _canonPanel.Visible = !CanonSdk.IsAvailable(_options.InstallDir, _options.TestMode);
-            _verifyCheck.Visible = Installation.VerifyShortcutPath(_options.TestMode, _options.InstallDir) != null;
+            _verifyCheck.Visible = !_options.Update && Installation.VerifyShortcutPath(_options.TestMode, _options.InstallDir) != null;
             _launchCheck.Visible = !_options.TestMode;
+            // Après une mise à jour, LibreBooth se rouvre (sauf si l'on décoche la case).
+            if (_options.Update) _launchCheck.Checked = true;
             _installButton.Text = "Terminer";
             _installButton.Enabled = true;
             _cancelButton.Visible = false;

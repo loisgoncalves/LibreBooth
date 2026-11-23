@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$Configuration = 'Release',
     # Version publique (GitHub) : sans les fichiers de Canon et de DNP, qui ne peuvent pas être redistribués.
     [switch]$Public,
@@ -16,7 +16,9 @@ Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 $root = (Resolve-Path "$PSScriptRoot\..").Path
 $appProject = Join-Path $root 'src\LibreBooth.App\LibreBooth.App.csproj'
 $installerProject = Join-Path $PSScriptRoot 'LibreBooth.Installer\LibreBooth.Installer.csproj'
-$version = ([xml](Get-Content $appProject)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+# Numéro de version unique de LibreBooth (Directory.Build.props, changé par installer\nouvelle-version.ps1).
+$version = ([xml](Get-Content -Raw (Join-Path $root 'Directory.Build.props'))).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Numéro de version illisible dans Directory.Build.props : $version" }
 $outFolder = if ($Public) { Join-Path $root 'publish\github' } else { Join-Path $root 'publish' }
 $publish = Join-Path $outFolder 'LibreBooth'
 $setupFile = Join-Path $outFolder "LibreBooth-$version-Installation.exe"
@@ -75,12 +77,17 @@ dotnet build $installerProject -c $Configuration -o $installerOut -p:Version=$ve
 if ($LASTEXITCODE -ne 0) { throw 'Compilation du programme d''installation impossible' }
 
 if ($Public) {
-    # Garde-fou : aucun fichier compilé ou texte de la version publique ne doit contenir le nom du compte Windows.
+    # Garde-fou : aucun fichier compilé ou texte de la version publique ne doit contenir le nom du compte Windows ni
+    # celui du PC. Ils sont cherchés comme mots entiers : le nom du compte Windows peut être le début de celui du
+    # compte GitHub, qui figure dans l'adresse publique du dépôt (mises à jour), sans que ce soit une fuite.
     $own = @(Get-ChildItem $publish -Recurse -File | Where-Object { $_.Name -like 'LibreBooth*' -or $_.Extension -in '.json', '.txt', '.md', '.config' })
     $own += Get-Item (Join-Path $installerOut 'LibreBooth-Installation.exe')
-    foreach ($encoding in 'ascii', 'unicode') {
-        $hits = $own | Select-String -Pattern $env:USERNAME -SimpleMatch -Encoding $encoding -List
-        if ($hits) { throw "Le nom du compte Windows se trouve dans : $(($hits.Path | Sort-Object -Unique) -join ', ')" }
+    foreach ($name in @($env:USERNAME, $env:COMPUTERNAME) | Where-Object { $_ }) {
+        $word = '(?<![\p{L}\p{N}])' + [regex]::Escape($name) + '(?![\p{L}\p{N}])'
+        foreach ($encoding in 'ascii', 'unicode') {
+            $hits = $own | Select-String -Pattern $word -Encoding $encoding -List
+            if ($hits) { throw "Le nom du compte Windows ou du PC se trouve dans : $(($hits.Path | Sort-Object -Unique) -join ', ')" }
+        }
     }
 }
 

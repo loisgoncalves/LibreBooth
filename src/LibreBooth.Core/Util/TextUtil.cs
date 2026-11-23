@@ -35,7 +35,7 @@ public static class TextUtil
         return slug.Length == 0 ? "sans-nom" : slug;
     }
 
-    /// <summary>Remplace {evenement}, {date} (22.11.2026) et {date_longue} (22 novembre 2026) dans un texte de modèle ou d'e-mail.</summary>
+    /// <summary>Remplace {evenement}, {date} (22.11.2026) et {date_longue} (22 novembre 2026) dans un texte de modèle.</summary>
     public static string ApplyVariables(string? template, string eventName, DateTime eventDate) =>
         (template ?? string.Empty)
             .Replace("{evenement}", eventName, StringComparison.OrdinalIgnoreCase)

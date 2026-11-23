@@ -7,10 +7,8 @@ composants libres suivants, chacun sous sa propre licence :
 |---|---|---|---|
 | .NET 10 (moteur d'exécution) et WPF | Microsoft et la .NET Foundation | MIT | https://github.com/dotnet/runtime · https://github.com/dotnet/wpf |
 | SkiaSharp 3.119.4 (et la bibliothèque Skia) | Microsoft (Skia : Google) | MIT (Skia : BSD 3 clauses) | https://github.com/mono/SkiaSharp |
-| MailKit 4.18.2 et MimeKit | Jeffrey Stedfast | MIT | https://github.com/jstedfast/MailKit |
 | CommunityToolkit.Mvvm 8.4.2 | .NET Foundation | MIT | https://github.com/CommunityToolkit/dotnet |
 | Serilog 4.4.0 et Serilog.Sinks.File 7.0.0 | Serilog Contributors | Apache 2.0 | https://github.com/serilog/serilog |
-| System.Security.Cryptography.ProtectedData | Microsoft | MIT | https://github.com/dotnet/runtime |
 
 Pour les tests seulement (non distribués) : xUnit (Apache 2.0), Microsoft.NET.Test.Sdk (MIT), coverlet (MIT).
 

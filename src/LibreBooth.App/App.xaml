@@ -26,9 +26,6 @@
             <DataTemplate DataType="{x:Type kiosk:ReviewViewModel}">
                 <views:ReviewView />
             </DataTemplate>
-            <DataTemplate DataType="{x:Type kiosk:EmailViewModel}">
-                <views:EmailView />
-            </DataTemplate>
             <DataTemplate DataType="{x:Type kiosk:ThanksViewModel}">
                 <views:ThanksView />
             </DataTemplate>

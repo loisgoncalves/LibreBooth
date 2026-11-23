@@ -64,7 +64,6 @@ public partial class MainWindow : Window
             HideCursor();
         };
         PreviewKeyDown += OnPreviewKeyDown;
-        PreviewTextInput += OnPreviewTextInput;
         IsVisibleChanged += (_, _) =>
         {
             if (IsVisible)
@@ -185,40 +184,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (_kiosk.State == KioskState.Email)
-        {
-            if (e.Key == Key.Back)
-            {
-                _kiosk.Email.KeyCommand.Execute("BACK");
-                e.Handled = true;
-            }
-            else if (e.Key == Key.Enter && _kiosk.Email.SendCommand.CanExecute(null))
-            {
-                _kiosk.Email.SendCommand.Execute(null);
-                e.Handled = true;
-            }
-            return;
-        }
-
         if (_kiosk.State == KioskState.Attract && IsStartKey(e.Key))
         {
             e.Handled = true;
             _kiosk.StartSession();
         }
-    }
-
-    /// <summary>Saisie au clavier physique sur l'écran e-mail.</summary>
-    private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
-    {
-        if (_kiosk.State != KioskState.Email || string.IsNullOrEmpty(e.Text)) return;
-        foreach (var character in e.Text)
-        {
-            if (char.IsLetterOrDigit(character) || "@.-_+".Contains(character))
-            {
-                _kiosk.Email.KeyCommand.Execute(character.ToString());
-            }
-        }
-        e.Handled = true;
     }
 
     private bool IsStartKey(Key key)

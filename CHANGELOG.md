@@ -3,6 +3,36 @@
 Chaque version a son propre numéro : le programme d'installation et le zip de la page « Releases » portent le
 même. La version installée s'affiche dans l'admin › Système.
 
+Numéro majeure.fonction.correctif : **majeure** quand les habitudes ou les fichiers de l'utilisateur changent,
+**fonction** pour une nouveauté, **correctif** pour une correction (voir le README, « Numéros de version »).
+
+## 2.0.0 – 23/11/2026
+
+Version majeure : les dossiers des événements changent (les anciens sont convertis au premier lancement).
+
+- **Choix de l'événement au lancement** : après le code PIN, LibreBooth propose d'ouvrir un événement existant
+  (avec sa vignette et ses chiffres) ou d'en créer un nouveau : nom, date, et personnalisation de départ (le thème de
+  LibreBooth ou celle d'un autre événement). Aussi depuis l'admin › Événement › « Changer d'événement… », où
+  l'événement se renomme.
+- **Dossiers d'événements plus simples** : `Evenements\2026-11-23 Mariage Julie et Tom\` avec `Photos`, `Montages`
+  et `Photos refusées` ; ce dont LibreBooth a besoin (personnalisation, fiches des sessions) est rangé dans un
+  dossier caché, `.librebooth`. Les événements des versions 1.x sont convertis au premier lancement, sans rien
+  effacer.
+- **Mises à jour depuis l'admin** : quand le PC est connecté à Internet, LibreBooth regarde au lancement si une
+  nouvelle version est publiée sur GitHub. Admin › Système › Mises à jour › « Installer la mise à jour » la
+  télécharge, contrôle son empreinte SHA-256 et l'installe, jamais pendant le photobooth. Photos, événements,
+  réglages et pilotes sont gardés.
+- **Désinstallation au choix** : tout garder (comme avant), supprimer les réglages, modèles, personnalisations,
+  pilotes ajoutés et journaux, ou aussi les photos de tous les événements (après confirmation). Tout part dans la
+  Corbeille de Windows ; le pilote de l'imprimante DNP reste installé.
+- Le programme d'installation reconnaît une installation existante : il met à jour le même dossier et prévient
+  avant d'installer une version plus ancienne.
+- **Défilement au pavé tactile** : les pages et les listes défilent au rythme du geste, au lieu de partir d'un coup.
+- **Envoi par e-mail retiré** (écran de saisie, réglages SMTP, file d'attente) : LibreBooth ne demande plus
+  l'adresse des invités.
+- **Numéros de version** : un seul numéro pour tout LibreBooth ; `installer\nouvelle-version.ps1` le fait monter
+  selon le type de changement et prépare l'entrée de l'historique.
+
 ## 1.6.0 – 23/11/2026
 
 - **Installation guidée des pilotes** : le programme d'installation télécharge le pilote Windows 11 de la DNP DS620

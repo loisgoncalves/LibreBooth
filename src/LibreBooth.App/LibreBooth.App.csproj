@@ -22,7 +22,6 @@
     <Authors>Loïs Gonçalves</Authors>
     <Company>Loïs Gonçalves</Company>
     <Copyright>© 2026 Loïs Gonçalves</Copyright>
-    <Version>1.6.0</Version>
     <!-- Logo de LibreBooth (assets\) : icône de l'exe, des raccourcis et des fenêtres -->
     <ApplicationIcon>..\..\assets\LibreBooth.ico</ApplicationIcon>
     <SatelliteResourceLanguages>fr</SatelliteResourceLanguages>

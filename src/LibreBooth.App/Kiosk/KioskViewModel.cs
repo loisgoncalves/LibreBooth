@@ -14,7 +14,7 @@ namespace LibreBooth.App.Kiosk;
 
 /// <summary>
 /// Chef d'orchestre du parcours invité : accueil, choix du modèle, prise de vue, montage, revue,
-/// e-mail, remerciements. Toute erreur mène à un écran d'erreur clair puis à un retour automatique à l'accueil.
+/// remerciements. Toute erreur mène à un écran d'erreur clair puis à un retour automatique à l'accueil.
 /// </summary>
 public sealed partial class KioskViewModel : ObservableObject
 {
@@ -42,7 +42,6 @@ public sealed partial class KioskViewModel : ObservableObject
         Shooting = new ShootingViewModel();
         Processing = new ProcessingViewModel();
         Review = new ReviewViewModel(this);
-        Email = new EmailViewModel(this);
         Thanks = new ThanksViewModel();
         Error = new ErrorViewModel(() => _machine.Reset());
 
@@ -73,7 +72,6 @@ public sealed partial class KioskViewModel : ObservableObject
     public ShootingViewModel Shooting { get; }
     public ProcessingViewModel Processing { get; }
     public ReviewViewModel Review { get; }
-    public EmailViewModel Email { get; }
     public ThanksViewModel Thanks { get; }
     public ErrorViewModel Error { get; }
 
@@ -153,7 +151,7 @@ public sealed partial class KioskViewModel : ObservableObject
             Attract.OperatorWarning = null;
         }
 
-        if (_machine.State is KioskState.Review or KioskState.Email) UpdateReviewPrintState();
+        if (_machine.State == KioskState.Review) UpdateReviewPrintState();
     }
 
     // ---------------------------------------------------------------- Activité et délais
@@ -179,7 +177,6 @@ public sealed partial class KioskViewModel : ObservableObject
             KioskState.Shooting => Shooting,
             KioskState.Processing => Processing,
             KioskState.Review => Review,
-            KioskState.Email => Email,
             KioskState.Thanks => Thanks,
             KioskState.Error => Error,
             _ => Attract,
@@ -417,7 +414,6 @@ public sealed partial class KioskViewModel : ObservableObject
         Review.Pieces = _session?.Template.Layout.DuplicateStrip == true
             ? ReviewViewModel.PiecesNoun(_session.Template.Layout)
             : null;
-        Review.ShowEmailButton = _services.Settings.Email.Enabled;
         UpdateReviewPrintState();
     }
 
@@ -465,15 +461,14 @@ public sealed partial class KioskViewModel : ObservableObject
     // ---------------------------------------------------------------- Recommencer
 
     /// <summary>
-    /// L'invité peut refaire sa série tant qu'il n'a rien imprimé ni demandé par e-mail (sinon il garderait la
-    /// photo refusée en plus de la nouvelle), et seulement le nombre de fois réglé dans l'admin.
+    /// L'invité peut refaire sa série tant qu'il n'a rien imprimé (sinon il garderait la photo refusée en plus de la
+    /// nouvelle), et seulement le nombre de fois réglé dans l'admin.
     /// </summary>
     private bool CanRetake(SessionData session)
     {
         var settings = _services.Settings;
         return session.RetakeCount < settings.Screens.RetakeLimit
                && session.PrintedCopies == 0
-               && session.EmailCount == 0
                && !(settings.Print.Enabled && settings.Print.AutoPrint);
     }
 
@@ -544,44 +539,7 @@ public sealed partial class KioskViewModel : ObservableObject
         }
     }
 
-    // ---------------------------------------------------------------- E-mail et fin
-
-    public void OpenEmail()
-    {
-        var email = _services.Settings.Email;
-        if (!email.Enabled) return;
-        Email.Reset(email.RequireConsent, email.ConsentText);
-        _machine.OpenEmail();
-    }
-
-    public void CloseEmail() => _machine.CloseEmail();
-
-    public void SubmitEmail(string address)
-    {
-        var session = _session;
-        if (session?.CompositePath == null)
-        {
-            _machine.CloseEmail();
-            return;
-        }
-
-        try
-        {
-            var attachments = new List<string> { session.CompositePath };
-            if (_services.Settings.Email.AttachOriginals) attachments.AddRange(session.Photos);
-            _services.Outbox.Enqueue(session.Event, address, attachments);
-            session.EmailCount++;
-            _services.Events.UpdateSession(session.Event, session.Id, r => r.Emails++);
-            Review.StatusMessage = "C'est noté ! Votre photo partira par e-mail dès que possible.";
-            UpdateReviewPrintState();
-        }
-        catch (Exception ex)
-        {
-            _log.Error(ex, "Mise en file de l'e-mail impossible");
-            Review.StatusMessage = "L'e-mail n'a pas pu être enregistré. Prévenez l'animateur.";
-        }
-        _machine.CloseEmail();
-    }
+    // ---------------------------------------------------------------- Fin
 
     public void Finish() => _machine.Finish();
 

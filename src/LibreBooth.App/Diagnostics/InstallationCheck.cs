@@ -43,7 +43,7 @@ public static class InstallationCheck
     private static readonly string[] ProgramFiles =
     {
         "LibreBooth.exe", "LibreBooth.dll", "LibreBooth.Core.dll", "SkiaSharp.dll", "libSkiaSharp.dll", "Serilog.dll",
-        "CommunityToolkit.Mvvm.dll", "MailKit.dll", "MimeKit.dll", "PresentationFramework.dll", "wpfgfx_cor3.dll",
+        "CommunityToolkit.Mvvm.dll", "PresentationFramework.dll", "wpfgfx_cor3.dll",
     };
 
     private static readonly string[] ThemeFonts = { "Gabriola", "Segoe Script", "Bahnschrift", "Georgia", "Segoe UI" };

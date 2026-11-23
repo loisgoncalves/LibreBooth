@@ -22,11 +22,15 @@ internal sealed class InstallOptions
 
     /// <summary>Essai sans droits d'administrateur : ni registre, ni pilote ; raccourcis dans un sous-dossier.</summary>
     public bool TestMode { get; set; }
+
+    /// <summary>Mise à jour lancée depuis l'admin de LibreBooth : même dossier, mêmes raccourcis, pilotes non touchés.</summary>
+    public bool Update { get; set; }
 }
 
 /// <summary>
 /// Installation et désinstallation de LibreBooth. Seuls les fichiers installés (listés dans fichiers-installes.txt)
-/// sont supprimés : les photos, événements et réglages (C:\Users\&lt;nom&gt;\LibreBooth) ne sont jamais touchés.
+/// sont supprimés : les photos, événements et réglages (C:\Users\&lt;nom&gt;\LibreBooth) ne sont touchés que si
+/// l'utilisateur le demande à la désinstallation (voir <see cref="UserData"/>).
 /// </summary>
 internal static class Installation
 {
@@ -94,6 +98,64 @@ internal static class Installation
 
     public static bool IsLibreBoothRunning() => Process.GetProcessesByName("LibreBooth").Length > 0;
 
+    /// <summary>Mise à jour : LibreBooth se ferme tout seul après avoir lancé l'installation ; on lui en laisse le temps.</summary>
+    /// <returns>Vrai si LibreBooth est fermé.</returns>
+    public static bool WaitForLibreBoothToClose(TimeSpan timeout)
+    {
+        var deadline = DateTime.Now + timeout;
+        while (IsLibreBoothRunning())
+        {
+            if (DateTime.Now > deadline) return false;
+            System.Threading.Thread.Sleep(500);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Fichiers des fabricants (SDK Canon, statut DNP) : ils ne sont pas dans la version publique. Une mise à jour ne
+    /// les retire donc jamais (sinon l'appareil ne marcherait plus) ; seule la désinstallation les supprime.
+    /// </summary>
+    public static readonly string[] VendorFiles = CanonSdk.Files.Concat(new[] { "cspstat.dll" }).ToArray();
+
+    /// <summary>Version de LibreBooth installée dans ce dossier (null s'il n'y en a pas).</summary>
+    public static string? InstalledVersion(string dir)
+    {
+        try
+        {
+            var exe = Path.Combine(dir, ExeName);
+            if (!File.Exists(exe)) return null;
+            var version = FileVersionInfo.GetVersionInfo(exe).ProductVersion;
+            if (string.IsNullOrWhiteSpace(version)) return null;
+            var plus = version!.IndexOf('+');
+            return plus > 0 ? version.Substring(0, plus) : version;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Dossier de l'installation inscrite dans Windows (Paramètres › Applications), ou null.</summary>
+    public static string? RegisteredInstallDir()
+    {
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(UninstallKey);
+            return key?.GetValue("InstallLocation") is string dir && Directory.Exists(dir) ? dir : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Le raccourci du Bureau existe (une mise à jour le garde, ou le laisse absent).</summary>
+    public static bool HasDesktopShortcut(bool testMode, string dir) => File.Exists(Path.Combine(DesktopFolder(testMode, dir), AppShortcut));
+
+    /// <summary>La première version est-elle plus ancienne que la seconde ? (« 2.0.3 » avant « 2.1.0 » ; faux si l'une est illisible)</summary>
+    public static bool IsOlder(string? candidate, string? than) =>
+        System.Version.TryParse(candidate, out var a) && System.Version.TryParse(than, out var b) && a < b;
+
     /// <summary>Le dossier choisi reçoit toujours un sous-dossier dédié « LibreBooth » (jamais la racine d'un disque).</summary>
     public static string NormalizeInstallDir(string folder)
     {
@@ -114,11 +176,11 @@ internal static class Installation
     {
         var dir = options.InstallDir;
         var warnings = new List<string>();
-        Log($"Installation de LibreBooth {Version} dans {dir} (pilote : {options.InstallDriver}, pilote à télécharger : {options.DownloadDriver}, bureau : {options.DesktopShortcut}, essai : {options.TestMode})");
+        Log($"{(options.Update ? $"Mise à jour de LibreBooth {InstalledVersion(dir) ?? "?"} vers" : "Installation de LibreBooth")} {Version} dans {dir} (pilote : {options.InstallDriver}, pilote à télécharger : {options.DownloadDriver}, bureau : {options.DesktopShortcut}, essai : {options.TestMode})");
         Directory.CreateDirectory(dir);
 
         progress(2, "Suppression de l'ancienne version…");
-        RemoveListedFiles(dir);
+        RemoveListedFiles(dir, keep: VendorFiles);
 
         var entries = payload.Archive.Entries
             .Where(e => Normalize(e.FullName).StartsWith(Payload.AppFolder, StringComparison.Ordinal) && !Normalize(e.FullName).EndsWith("/", StringComparison.Ordinal))
@@ -153,7 +215,7 @@ internal static class Installation
         CreateShortcut(Path.Combine(startMenu, AppShortcut), exe, "", "Logiciel du photobooth");
         CreateShortcut(Path.Combine(startMenu, VerifyShortcut), exe, "--verifier", "Vérifie que tout est en place : dossiers, pilotes, imprimante, appareil photo");
         CreateShortcut(Path.Combine(startMenu, DiagnosticShortcut), exe, "--diagnostic", "Vérifie l'appareil photo et l'imprimante (LibreBooth doit être fermé)");
-        CreateShortcut(Path.Combine(startMenu, UninstallShortcut), uninstaller, "/desinstaller", "Désinstaller LibreBooth (vos photos sont conservées)");
+        CreateShortcut(Path.Combine(startMenu, UninstallShortcut), uninstaller, "/desinstaller", "Désinstaller LibreBooth (garder ou supprimer réglages et photos, au choix)");
         var desktop = Path.Combine(DesktopFolder(options.TestMode, dir), AppShortcut);
         if (options.DesktopShortcut) CreateShortcut(desktop, exe, "", "Logiciel du photobooth");
         else TryDelete(desktop);
@@ -329,9 +391,9 @@ internal static class Installation
         TryDeleteFolder(startMenu);
         TryDelete(Path.Combine(DesktopFolder(testMode, dir), AppShortcut));
 
-        RemoveListedFiles(dir);
+        RemoveListedFiles(dir, keep: Array.Empty<string>());
         // Fichiers des fabricants ajoutés après l'installation (SDK Canon…) : gardés lors des mises à jour, retirés ici.
-        foreach (var file in CanonSdk.Files.Concat(new[] { "cspstat.dll" })) TryDelete(Path.Combine(dir, file));
+        foreach (var file in VendorFiles) TryDelete(Path.Combine(dir, file));
         RemoveEmptyFolders(dir);
 
         // Lancement au démarrage de Windows (réglé dans l'admin de LibreBooth), s'il pointe vers ce dossier.
@@ -360,21 +422,32 @@ internal static class Installation
             }
         }
 
-        // Le programme de désinstallation ne peut pas s'effacer lui-même : Windows le fait juste après sa fermeture.
-        var self = Path.Combine(dir, UninstallerName);
-        var command = $"/c ping 127.0.0.1 -n 3 > nul & del /f /q \"{self}\" & rmdir \"{dir}\"";
-        Process.Start(new ProcessStartInfo("cmd.exe", command) { CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden });
-        Log("Désinstallation terminée");
+        Log("Programme désinstallé");
     }
 
-    /// <summary>Supprime les fichiers listés par l'installation précédente (et rien d'autre).</summary>
-    private static void RemoveListedFiles(string dir)
+    /// <summary>
+    /// Le programme de désinstallation ne peut pas s'effacer lui-même : Windows le fait deux secondes après sa
+    /// fermeture. À appeler en tout dernier, juste avant de quitter (pas pendant qu'un message est affiché).
+    /// </summary>
+    /// <param name="deleteLog">Efface aussi ce journal (quand tout ce qui concerne LibreBooth doit partir).</param>
+    public static void DeleteUninstallerAfterExit(string dir, bool deleteLog)
+    {
+        var self = Path.Combine(dir, UninstallerName);
+        var command = $"/c ping 127.0.0.1 -n 3 > nul & del /f /q \"{self}\" & rmdir \"{dir}\"";
+        if (deleteLog) command += $" & del /f /q \"{LogFile}\"";
+        Log("Désinstallation terminée" + (deleteLog ? " (ce journal est effacé ensuite)" : ""));
+        Process.Start(new ProcessStartInfo("cmd.exe", command) { CreateNoWindow = true, UseShellExecute = false, WindowStyle = ProcessWindowStyle.Hidden });
+    }
+
+    /// <summary>Supprime les fichiers listés par l'installation précédente (et rien d'autre), sauf ceux à garder.</summary>
+    private static void RemoveListedFiles(string dir, string[] keep)
     {
         var manifest = Path.Combine(dir, ManifestName);
         if (!File.Exists(manifest)) return;
         foreach (var line in File.ReadAllLines(manifest))
         {
             if (string.IsNullOrWhiteSpace(line)) continue;
+            if (keep.Any(k => string.Equals(k, line.Trim(), StringComparison.OrdinalIgnoreCase))) continue;
             string path;
             try
             {

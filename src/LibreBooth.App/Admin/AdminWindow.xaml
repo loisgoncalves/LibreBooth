@@ -66,9 +66,20 @@
     <Grid x:Name="RootGrid" Background="White" TextElement.FontSize="16" TextElement.FontFamily="Segoe UI">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+
+        <!-- Nouvelle version trouvée sur GitHub (seulement dans l'admin, jamais au photobooth) -->
+        <Border x:Name="UpdateBanner" Grid.Row="1" Visibility="Collapsed" Background="#E9F2FC" BorderBrush="#B9D3F0" BorderThickness="0,0,0,1" Padding="16,6">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Voir la mise à jour" Click="ShowUpdate_Click" Margin="12,0,0,0" MinHeight="30" Padding="12,3" />
+                <TextBlock Text="&#xE896;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="18" Foreground="#1F5FA8"
+                           VerticalAlignment="Center" Margin="0,0,10,0" />
+                <TextBlock x:Name="UpdateBannerText" VerticalAlignment="Center" Foreground="#173F6E" FontWeight="SemiBold" TextWrapping="Wrap" />
+            </DockPanel>
+        </Border>
 
         <!-- En-tête : le logo, et comment passer de l'admin au photobooth -->
         <Border Background="#F4F8F5" BorderBrush="#D5E6DA" BorderThickness="0,0,0,1" Padding="16,8">
@@ -87,7 +98,7 @@
             </DockPanel>
         </Border>
 
-        <TabControl x:Name="AdminTabs" Grid.Row="1" Margin="8" Padding="0">
+        <TabControl x:Name="AdminTabs" Grid.Row="2" Margin="8" Padding="0">
 
             <!-- ================================================================ Événement -->
             <TabItem Header="Événement" Padding="16,8">
@@ -98,31 +109,16 @@
                                 <TextBlock x:Name="EventNameText" FontSize="24" FontWeight="Bold" />
                                 <TextBlock x:Name="EventDateText" Style="{StaticResource Value}" />
                                 <TextBlock x:Name="StatsText" Style="{StaticResource Value}" Foreground="#0B5" />
-                                <TextBlock x:Name="EventFolderText" Style="{StaticResource Help}" />
-                                <WrapPanel>
-                                    <Button Content="Ouvrir le dossier de l'événement" Click="OpenEventFolder_Click" />
+                                <WrapPanel Margin="0,6,0,0">
+                                    <Button Content="Ouvrir le dossier des photos" Click="OpenEventFolder_Click" />
+                                    <Button Content="Changer d'événement…" Click="ChangeEvent_Click" />
                                 </WrapPanel>
-                                <TextBlock Text="Renommer l'événement (le texte {evenement} des modèles change aussi)" Style="{StaticResource FieldLabel}" />
+                                <TextBlock x:Name="EventFolderText" Style="{StaticResource Help}" />
+                                <TextBlock Text="Renommer l'événement (le texte {evenement} des modèles et le nom du dossier changent aussi)" Style="{StaticResource FieldLabel}" />
                                 <WrapPanel>
                                     <TextBox x:Name="RenameNameBox" Width="420" Margin="0,2,8,8" />
                                     <DatePicker x:Name="RenameDatePicker" Width="160" Margin="0,2,8,8" />
                                     <Button Content="Enregistrer" Click="RenameEvent_Click" />
-                                </WrapPanel>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Header="Nouvel événement">
-                            <StackPanel>
-                                <TextBlock Text="Chaque événement a son propre dossier de photos et ses propres statistiques." Style="{StaticResource Help}" />
-                                <WrapPanel>
-                                    <TextBox x:Name="NewEventNameBox" Width="420" Margin="0,2,8,8" />
-                                    <DatePicker x:Name="NewEventDatePicker" Width="160" Margin="0,2,8,8" />
-                                    <Button Content="Créer et activer" Click="CreateEvent_Click" />
-                                </WrapPanel>
-                                <TextBlock Text="Ou reprendre un événement existant :" Style="{StaticResource FieldLabel}" />
-                                <WrapPanel>
-                                    <ComboBox x:Name="EventsCombo" Width="420" Margin="0,2,8,8" />
-                                    <Button Content="Activer" Click="ActivateEvent_Click" />
                                 </WrapPanel>
                             </StackPanel>
                         </GroupBox>
@@ -147,8 +143,6 @@
                                 <WrapPanel Margin="0,8,0,0">
                                     <Button Content="Actualiser" Click="RefreshGallery_Click" />
                                     <Button Content="Réimprimer la photo choisie" Click="Reprint_Click" />
-                                    <TextBox x:Name="ResendAddressBox" Width="300" Margin="16,4,8,4" VerticalContentAlignment="Center" />
-                                    <Button Content="Envoyer par e-mail" Click="ResendEmail_Click" />
                                 </WrapPanel>
                                 <TextBlock x:Name="GalleryStatusText" Style="{StaticResource Help}" />
                             </StackPanel>
@@ -397,11 +391,10 @@
                                 <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Screens.CountdownSeconds, UpdateSourceTrigger=PropertyChanged}" />
                                 <TextBlock Text="Affichage de chaque photo après la prise (millisecondes)" Style="{StaticResource FieldLabel}" />
                                 <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Screens.PreviewMilliseconds, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock Text="Retour automatique si personne ne touche l'écran (secondes) : choix du format / revue / e-mail / fin / erreur" Style="{StaticResource FieldLabel}" />
+                                <TextBlock Text="Retour automatique si personne ne touche l'écran (secondes) : choix du format / revue / fin / erreur" Style="{StaticResource FieldLabel}" />
                                 <WrapPanel>
                                     <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.ChooseTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
                                     <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.ReviewTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
-                                    <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.EmailTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
                                     <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.ThanksSeconds, UpdateSourceTrigger=PropertyChanged}" />
                                     <TextBox Width="80" Margin="0,2,8,8" Text="{Binding Screens.ErrorSeconds, UpdateSourceTrigger=PropertyChanged}" />
                                 </WrapPanel>
@@ -410,72 +403,9 @@
                                 <TextBlock Text="Bouton « Recommencer » sur l'écran de la photo : nombre de fois par invité (0 = pas de bouton)" Style="{StaticResource FieldLabel}" />
                                 <ComboBox x:Name="RetakeCombo" Width="100" HorizontalAlignment="Left" SelectedItem="{Binding Screens.RetakeLimit}" />
                                 <TextBlock Style="{StaticResource Help}">
-                                    L'invité refait toute sa série tant qu'il n'a ni imprimé ni demandé d'e-mail. Les photos refusées sont gardées
-                                    dans le dossier « refusees » de l'événement. Le bouton n'apparaît pas avec l'impression automatique.
+                                    L'invité refait toute sa série tant qu'il n'a pas imprimé. Les photos refusées sont gardées
+                                    dans le dossier « Photos refusées » de l'événement. Le bouton n'apparaît pas avec l'impression automatique.
                                 </TextBlock>
-                            </StackPanel>
-                        </GroupBox>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
-            <!-- ================================================================ E-mail -->
-            <TabItem Header="E-mail" Padding="16,8">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="16" MaxWidth="1150" HorizontalAlignment="Left">
-                        <GroupBox Header="Serveur d'envoi (SMTP)">
-                            <StackPanel>
-                                <CheckBox Content="Proposer l'envoi par e-mail aux invités" IsChecked="{Binding Email.Enabled}" />
-                                <TextBlock Style="{StaticResource Help}">
-                                    Gmail : serveur smtp.gmail.com, port 587, STARTTLS, identifiant = votre adresse Gmail, mot de passe = un « mot de passe d'application »
-                                    (Compte Google › Sécurité › Validation en deux étapes › Mots de passe des applications). Orange : smtp.orange.fr, port 465, SSL.
-                                </TextBlock>
-                                <TextBlock Text="Serveur SMTP" Style="{StaticResource FieldLabel}" />
-                                <TextBox Width="420" HorizontalAlignment="Left" Text="{Binding Email.SmtpHost, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock Text="Port" Style="{StaticResource FieldLabel}" />
-                                <TextBox Width="100" HorizontalAlignment="Left" Text="{Binding Email.SmtpPort, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock Text="Sécurité" Style="{StaticResource FieldLabel}" />
-                                <ComboBox x:Name="SecurityCombo" Width="200" HorizontalAlignment="Left" SelectedItem="{Binding Email.Security}" />
-                                <TextBlock Text="Identifiant" Style="{StaticResource FieldLabel}" />
-                                <TextBox Width="420" HorizontalAlignment="Left" Text="{Binding Email.Username, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock Text="Mot de passe (enregistré chiffré par Windows)" Style="{StaticResource FieldLabel}" />
-                                <WrapPanel>
-                                    <PasswordBox x:Name="SmtpPasswordBox" Width="300" Margin="0,2,8,8" />
-                                    <Button Content="Enregistrer le mot de passe" Click="SavePassword_Click" />
-                                </WrapPanel>
-                                <TextBlock x:Name="PasswordStateText" Style="{StaticResource Help}" />
-                                <TextBlock Text="Adresse d'expéditeur" Style="{StaticResource FieldLabel}" />
-                                <TextBox Width="420" HorizontalAlignment="Left" Text="{Binding Email.FromAddress, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock Text="Nom d'expéditeur" Style="{StaticResource FieldLabel}" />
-                                <TextBox Width="420" HorizontalAlignment="Left" Text="{Binding Email.FromName, UpdateSourceTrigger=PropertyChanged}" />
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Header="Message envoyé aux invités ({evenement} et {date} sont remplacés)">
-                            <StackPanel>
-                                <TextBlock Text="Objet" Style="{StaticResource FieldLabel}" />
-                                <TextBox Text="{Binding Email.Subject, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock Text="Texte" Style="{StaticResource FieldLabel}" />
-                                <TextBox Height="120" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" Text="{Binding Email.Body, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock Text="Mention RGPD affichée sous l'adresse" Style="{StaticResource FieldLabel}" />
-                                <TextBox Height="60" AcceptsReturn="True" TextWrapping="Wrap" Text="{Binding Email.ConsentText, UpdateSourceTrigger=PropertyChanged}" />
-                                <CheckBox Content="Exiger que l'invité coche la mention avant l'envoi" IsChecked="{Binding Email.RequireConsent}" />
-                                <CheckBox Content="Joindre aussi les photos d'origine (en plus du montage)" IsChecked="{Binding Email.AttachOriginals}" />
-                            </StackPanel>
-                        </GroupBox>
-
-                        <GroupBox Header="Test et file d'attente">
-                            <StackPanel>
-                                <TextBlock Text="Adresse de test" Style="{StaticResource FieldLabel}" />
-                                <WrapPanel>
-                                    <TextBox x:Name="TestAddressBox" Width="360" Margin="0,2,8,8" />
-                                    <Button x:Name="TestEmailButton" Content="Envoyer un e-mail de test" Click="SendTestEmail_Click" />
-                                </WrapPanel>
-                                <TextBlock x:Name="TestEmailResult" Style="{StaticResource Value}" />
-                                <TextBlock x:Name="OutboxStatusText" Style="{StaticResource Value}" Margin="0,12,0,4" />
-                                <WrapPanel>
-                                    <Button Content="Réessayer maintenant" Click="RetryOutbox_Click" />
-                                </WrapPanel>
                             </StackPanel>
                         </GroupBox>
                     </StackPanel>
@@ -499,7 +429,7 @@
             </TabItem>
 
             <!-- ================================================================ Système -->
-            <TabItem Header="Système" Padding="16,8">
+            <TabItem x:Name="SystemTab" Header="Système" Padding="16,8">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16" MaxWidth="1150" HorizontalAlignment="Left">
                         <GroupBox Header="Code PIN de l'admin">
@@ -521,6 +451,24 @@
                             </StackPanel>
                         </GroupBox>
 
+                        <GroupBox x:Name="UpdatesGroup" Header="Mises à jour">
+                            <StackPanel>
+                                <CheckBox Content="Rechercher les nouvelles versions au lancement de LibreBooth (quand le PC est connecté à Internet)"
+                                          IsChecked="{Binding CheckForUpdates}" />
+                                <TextBlock x:Name="UpdateStatusText" Style="{StaticResource Value}" FontWeight="SemiBold" />
+                                <TextBlock x:Name="UpdateNotesText" Style="{StaticResource Help}" Visibility="Collapsed" Margin="16,2,0,8" />
+                                <ProgressBar x:Name="UpdateProgress" Height="10" Width="460" HorizontalAlignment="Left" Minimum="0" Maximum="1"
+                                             Visibility="Collapsed" Margin="0,4,0,6" />
+                                <WrapPanel>
+                                    <Button x:Name="InstallUpdateButton" FontWeight="SemiBold" Click="InstallUpdate_Click" Visibility="Collapsed" />
+                                    <Button x:Name="CheckUpdatesButton" Content="Rechercher maintenant" Click="CheckUpdates_Click" />
+                                    <Button x:Name="UpdatePageButton" Content="Voir les nouveautés sur GitHub" Click="UpdatePage_Click" Visibility="Collapsed" />
+                                </WrapPanel>
+                                <TextBlock Style="{StaticResource Help}"
+                                           Text="Une mise à jour s'installe seulement d'ici, jamais pendant le photobooth. LibreBooth télécharge la nouvelle version depuis GitHub, contrôle son empreinte (SHA-256), puis se ferme : Windows demande l'autorisation, et la nouvelle version remplace l'ancienne. Photos, événements, réglages et pilotes sont gardés." />
+                            </StackPanel>
+                        </GroupBox>
+
                         <GroupBox Header="À propos de LibreBooth">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -536,7 +484,7 @@
                                     </TextBlock>
                                     <TextBlock Style="{StaticResource Value}" Text="Logiciel de photobooth gratuit, sans licence ni abonnement. © 2026 Loïs Gonçalves." />
                                     <TextBlock Style="{StaticResource Help}"
-                                               Text="Avec les bibliothèques libres .NET et WPF, SkiaSharp, MailKit, CommunityToolkit.Mvvm et Serilog. Les pilotes Canon (EDSDK) et DNP (cspstat.dll) appartiennent à leurs fabricants." />
+                                               Text="Avec les bibliothèques libres .NET et WPF, SkiaSharp, CommunityToolkit.Mvvm et Serilog. Les pilotes Canon (EDSDK) et DNP (cspstat.dll) appartiennent à leurs fabricants." />
                                     <TextBlock x:Name="ModeText" Style="{StaticResource Value}" />
                                     <TextBlock x:Name="DataFolderText" Style="{StaticResource Value}" />
                                     <WrapPanel>
@@ -560,7 +508,7 @@
             </TabItem>
         </TabControl>
 
-        <Border Grid.Row="2" Background="#F3F3F3" BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="12">
+        <Border Grid.Row="3" Background="#F3F3F3" BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="12">
             <DockPanel>
                 <Button x:Name="StartBoothButton" DockPanel.Dock="Right" Click="Close_Click" Cursor="Hand" Margin="0"
                         ToolTip="Ferme l'administration et lance l'écran d'accueil pour les invités">

@@ -45,14 +45,6 @@
                            TextAlignment="Center" Margin="0,12,0,0"
                            Visibility="{Binding PrintHint, Converter={StaticResource NullToCollapsed}}" />
 
-                <Button Style="{StaticResource SecondaryButton}" Command="{Binding EmailCommand}" Margin="0,26,0,0"
-                        Visibility="{Binding ShowEmailButton, Converter={StaticResource BoolToVisibility}}">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE715;" FontFamily="{StaticResource IconFont}" Margin="0,0,24,0" VerticalAlignment="Center" />
-                        <TextBlock Text="Recevoir par e-mail" VerticalAlignment="Center" />
-                    </StackPanel>
-                </Button>
-
                 <Button Style="{StaticResource SecondaryButton}" Command="{Binding RetakeCommand}" Margin="0,26,0,0"
                         Visibility="{Binding ShowRetakeButton, Converter={StaticResource BoolToVisibility}}">
                     <StackPanel Orientation="Horizontal">

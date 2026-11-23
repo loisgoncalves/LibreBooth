@@ -18,13 +18,11 @@ public sealed class SessionStateMachineTests
         Assert.True(sm.ShotCompleted());
         Assert.Equal(KioskState.Processing, sm.State);
         Assert.True(sm.CompositionReady());
-        Assert.True(sm.OpenEmail());
-        Assert.True(sm.CloseEmail());
         Assert.True(sm.Finish());
         Assert.True(sm.OnTimeout());
 
         Assert.Equal(
-            new[] { KioskState.Shooting, KioskState.Processing, KioskState.Review, KioskState.Email, KioskState.Review, KioskState.Thanks, KioskState.Attract },
+            new[] { KioskState.Shooting, KioskState.Processing, KioskState.Review, KioskState.Thanks, KioskState.Attract },
             visited);
     }
 
@@ -45,7 +43,6 @@ public sealed class SessionStateMachineTests
         var sm = new SessionStateMachine();
 
         Assert.False(sm.CompositionReady());
-        Assert.False(sm.OpenEmail());
         Assert.False(sm.Finish());
         Assert.False(sm.ShotCompleted());
         Assert.False(sm.OnTimeout());
@@ -68,11 +65,10 @@ public sealed class SessionStateMachineTests
         sm.BeginShooting(1);
         sm.ShotCompleted();
         sm.CompositionReady();
-        sm.OpenEmail();
-        sm.OnTimeout();
-        Assert.Equal(KioskState.Review, sm.State);
         sm.OnTimeout();
         Assert.Equal(KioskState.Thanks, sm.State);
+        sm.OnTimeout();
+        Assert.Equal(KioskState.Attract, sm.State);
     }
 
     [Fact]

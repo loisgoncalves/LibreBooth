@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,7 +17,7 @@ using LibreBooth.Core.Config;
 using LibreBooth.Core.Events;
 using LibreBooth.Core.Hardware;
 using LibreBooth.Core.Layouts;
-using LibreBooth.Core.Sharing;
+using LibreBooth.Core.Updates;
 using LibreBooth.Core.Util;
 using Microsoft.Win32;
 using Serilog;
@@ -54,7 +55,6 @@ public partial class AdminWindow : Window
         TemplatesList.ItemsSource = _templates;
         ProfilesList.ItemsSource = _profiles;
         GalleryList.ItemsSource = _gallery;
-        SecurityCombo.ItemsSource = Enum.GetValues<SmtpSecurity>();
         RotationCombo.ItemsSource = new[] { 0, 90, 180, 270 };
         var keys = new List<string> { "Space", "Enter", "B", "F5", "PageDown" };
         if (!keys.Contains(services.Settings.Screens.StartKey)) keys.Add(services.Settings.Screens.StartKey);
@@ -69,6 +69,7 @@ public partial class AdminWindow : Window
         };
         _refreshTimer.Tick += (_, _) => RefreshLiveStatus();
         Closing += OnClosing;
+        services.UpdateStatusChanged += OnUpdateStatusChanged;
     }
 
     /// <summary>« Quitter LibreBooth » (bouton, onglet Système, ou croix de la fenêtre confirmée).</summary>
@@ -114,7 +115,6 @@ public partial class AdminWindow : Window
         LoadCameraTab();
         LoadPrintTab();
         LoadTemplatesTab();
-        LoadEmailTab();
         LoadLogTab();
         LoadSystemTab();
         RefreshLiveStatus();
@@ -122,8 +122,9 @@ public partial class AdminWindow : Window
 
     private void OnClosingAdmin()
     {
+        _services.UpdateStatusChanged -= OnUpdateStatusChanged;
+        _updateDownload?.Cancel();
         CustomizationTab.Flush();
-        SaveTypedPassword();
         StopLiveTest();
         _refreshTimer.Stop();
         _services.Settings.Normalize();
@@ -153,16 +154,7 @@ public partial class AdminWindow : Window
         };
         UpdatePrinterTexts();
 
-        if (_tick++ % 3 == 0)
-        {
-            var pending = _services.Outbox.PendingCount;
-            OutboxStatusText.Text = pending == 0
-                ? "File d'attente : aucun e-mail en attente."
-                : $"File d'attente : {pending} e-mail(s) en attente."
-                  + (_services.Outbox.LastError != null ? $" Dernière erreur : {_services.Outbox.LastError}" : "")
-                  + (_services.Settings.Email.Enabled ? "" : " (l'envoi par e-mail est désactivé)");
-            UpdateStatsText();
-        }
+        if (_tick++ % 3 == 0) UpdateStatsText();
 
         FooterText.Text = $"Événement : {_services.CurrentEvent.Name} · Appareil : {StateLabel(camera.State)} · Imprimante : {_services.PrinterMonitor.Current.Message}";
     }
@@ -182,14 +174,10 @@ public partial class AdminWindow : Window
         var ev = _services.CurrentEvent;
         EventNameText.Text = ev.Name;
         EventDateText.Text = "Date : " + TextUtil.FormatLongDate(ev.Date);
-        EventFolderText.Text = "Dossier : " + ev.Folder;
+        EventFolderText.Text = $"Dossier : {ev.Folder}\nDedans : « {BoothEvent.PhotosFolderName} » (photos de l'appareil), "
+                               + $"« {BoothEvent.CompositesFolderName} » (photos imprimées) et « {BoothEvent.RefusedFolderName} » (séries refaites avec « Recommencer »).";
         RenameNameBox.Text = ev.Name;
         RenameDatePicker.SelectedDate = ev.Date;
-        NewEventNameBox.Text = "";
-        NewEventDatePicker.SelectedDate = DateTime.Today;
-        var events = _services.Events.ListAll();
-        EventsCombo.ItemsSource = events;
-        EventsCombo.SelectedItem = events.FirstOrDefault(e => string.Equals(e.Folder, ev.Folder, StringComparison.OrdinalIgnoreCase));
         UpdateStatsText();
         LoadGallery();
     }
@@ -197,8 +185,7 @@ public partial class AdminWindow : Window
     private void UpdateStatsText()
     {
         var stats = _services.CurrentEvent.Info.Stats;
-        StatsText.Text = $"{stats.Sessions} session(s) · {stats.Photos} photo(s) · {stats.Prints} impression(s) · "
-                         + $"{stats.EmailsQueued} e-mail(s) demandé(s), {stats.EmailsSent} envoyé(s)"
+        StatsText.Text = $"{stats.Sessions} session(s) · {stats.Photos} photo(s) · {stats.Prints} impression(s)"
                          + (stats.Retakes > 0 ? $" · {stats.Retakes} série(s) recommencée(s)" : "");
     }
 
@@ -220,28 +207,26 @@ public partial class AdminWindow : Window
 
     private void RenameEvent_Click(object sender, RoutedEventArgs e)
     {
+        CustomizationTab.Flush();
         var ev = _services.CurrentEvent;
-        _services.Events.Rename(ev, RenameNameBox.Text, RenameDatePicker.SelectedDate ?? ev.Date);
+        var folderFollowed = _services.RenameCurrentEvent(RenameNameBox.Text, RenameDatePicker.SelectedDate ?? ev.Date);
         _kiosk.RefreshFromSettings();
         LoadEventTab();
         CustomizationTab.LoadFromEvent();
+        if (!folderFollowed)
+        {
+            ShowError("L'événement est bien renommé, mais son dossier garde l'ancien nom : un fichier de ce dossier est sans doute "
+                      + "ouvert dans un autre programme. Fermez-le, puis cliquez de nouveau sur « Enregistrer ».");
+        }
     }
 
-    private void CreateEvent_Click(object sender, RoutedEventArgs e)
+    /// <summary>Même fenêtre qu'au lancement : ouvrir un autre événement ou en créer un.</summary>
+    private void ChangeEvent_Click(object sender, RoutedEventArgs e)
     {
         CustomizationTab.Flush();
-        var ev = _services.Events.Create(NewEventNameBox.Text, NewEventDatePicker.SelectedDate ?? DateTime.Today);
-        _services.OpenEvent(ev);
-        LoadEventTab();
-        CustomizationTab.LoadFromEvent();
-        LoadTemplatesTab();
-    }
-
-    private void ActivateEvent_Click(object sender, RoutedEventArgs e)
-    {
-        if (EventsCombo.SelectedItem is not BoothEvent ev) return;
-        CustomizationTab.Flush();
-        _services.OpenEvent(ev);
+        var chooser = new EventChooserWindow(_services.Events, _services.CurrentEvent.Folder, atStartup: false) { Owner = this };
+        if (chooser.ShowDialog() != true || chooser.Chosen is not { } ev) return;
+        if (!EventStore.SamePath(ev.Folder, _services.CurrentEvent.Folder)) _services.OpenEvent(ev);
         LoadEventTab();
         CustomizationTab.LoadFromEvent();
         LoadTemplatesTab();
@@ -268,26 +253,6 @@ public partial class AdminWindow : Window
             _log.Error(ex, "Réimpression impossible");
             GalleryStatusText.Text = "Réimpression impossible : " + ex.Message;
         }
-    }
-
-    private void ResendEmail_Click(object sender, RoutedEventArgs e)
-    {
-        if (GalleryList.SelectedItem is not GalleryItem item)
-        {
-            GalleryStatusText.Text = "Choisissez d'abord une photo dans la galerie.";
-            return;
-        }
-        var address = ResendAddressBox.Text.Trim();
-        if (!EmailValidator.IsValid(address))
-        {
-            GalleryStatusText.Text = "Adresse e-mail invalide.";
-            return;
-        }
-        _services.Outbox.Enqueue(_services.CurrentEvent, address, new[] { item.CompositePath });
-        ResendAddressBox.Text = "";
-        GalleryStatusText.Text = _services.Settings.Email.Enabled
-            ? "E-mail ajouté à la file d'attente."
-            : "E-mail ajouté à la file d'attente : il partira quand l'envoi par e-mail sera activé.";
     }
 
     // ================================================================ Appareil photo
@@ -741,59 +706,6 @@ public partial class AdminWindow : Window
 
     private void OpenTemplatesFolder_Click(object sender, RoutedEventArgs e) => Shell.OpenFolder(_services.Templates.Root);
 
-    // ================================================================ E-mail
-
-    private void LoadEmailTab()
-    {
-        PasswordStateText.Text = string.IsNullOrEmpty(_services.Settings.Email.ProtectedPassword)
-            ? "Aucun mot de passe enregistré."
-            : "Un mot de passe est enregistré (chiffré). Tapez-en un nouveau pour le remplacer.";
-    }
-
-    private void SavePassword_Click(object sender, RoutedEventArgs e) => SaveTypedPassword();
-
-    private void SaveTypedPassword()
-    {
-        if (string.IsNullOrEmpty(SmtpPasswordBox.Password)) return;
-        _services.Settings.Email.ProtectedPassword = PasswordProtector.Protect(SmtpPasswordBox.Password);
-        SmtpPasswordBox.Clear();
-        _services.SaveSettings();
-        PasswordStateText.Text = "Mot de passe enregistré (chiffré).";
-    }
-
-    private async void SendTestEmail_Click(object sender, RoutedEventArgs e)
-    {
-        SaveTypedPassword();
-        var address = TestAddressBox.Text.Trim();
-        if (!EmailValidator.IsValid(address))
-        {
-            TestEmailResult.Text = "Adresse de test invalide.";
-            return;
-        }
-        TestEmailButton.IsEnabled = false;
-        TestEmailResult.Text = "Envoi en cours…";
-        try
-        {
-            await SmtpEmailSender.SendTestAsync(_services.Settings.Email, address);
-            TestEmailResult.Text = "✓ E-mail de test envoyé : vérifiez la boîte de réception (et les courriers indésirables).";
-            _services.Outbox.TriggerNow();
-        }
-        catch (Exception ex)
-        {
-            TestEmailResult.Text = "Échec de l'envoi : " + ex.Message;
-        }
-        finally
-        {
-            TestEmailButton.IsEnabled = true;
-        }
-    }
-
-    private void RetryOutbox_Click(object sender, RoutedEventArgs e)
-    {
-        _services.Outbox.TriggerNow();
-        OutboxStatusText.Text = "Nouvel essai d'envoi lancé…";
-    }
-
     // ================================================================ Journal et système
 
     private void LoadLogTab()
@@ -811,6 +723,152 @@ public partial class AdminWindow : Window
         VersionText.Text = $"LibreBooth {App.Version}";
         ModeText.Text = _services.Options.Demo ? "Mode démo (lancé avec --demo)" : "Mode normal";
         DataFolderText.Text = "Données : " + _services.Paths.DataRoot;
+        ShowUpdateStatus();
+    }
+
+    // ================================================================ Mises à jour
+
+    private CancellationTokenSource? _updateDownload;
+
+    private void OnUpdateStatusChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(ShowUpdateStatus);
+
+    /// <summary>Bandeau en haut de l'admin et partie « Mises à jour » de l'onglet Système.</summary>
+    private void ShowUpdateStatus()
+    {
+        var update = _services.AvailableUpdate;
+        var downloading = _updateDownload != null;
+        UpdateBanner.Visibility = update != null && !downloading ? Visibility.Visible : Visibility.Collapsed;
+        if (update != null) UpdateBannerText.Text = $"Nouvelle version de LibreBooth disponible : {update.Version.ToString(3)} (vous avez la {App.Version}).";
+        CheckUpdatesButton.IsEnabled = !_services.IsCheckingForUpdates && !downloading;
+        // Pendant le téléchargement, le texte suit la progression.
+        if (downloading) return;
+
+        UpdateProgress.Visibility = Visibility.Collapsed;
+        UpdateNotesText.Visibility = Visibility.Collapsed;
+        InstallUpdateButton.Visibility = Visibility.Collapsed;
+        UpdatePageButton.Visibility = Visibility.Collapsed;
+        if (_services.IsCheckingForUpdates)
+        {
+            UpdateStatusText.Text = "Recherche d'une nouvelle version…";
+            return;
+        }
+        if (update != null)
+        {
+            var version = update.Version.ToString(3);
+            UpdateStatusText.Text = $"Nouvelle version disponible : LibreBooth {version} (vous avez la {App.Version}).";
+            UpdateNotesText.Text = update.Notes;
+            UpdateNotesText.Visibility = update.Notes.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+            UpdatePageButton.Visibility = Visibility.Visible;
+            if (AppServices.IsInstalledCopy)
+            {
+                InstallUpdateButton.Content = $"Installer la mise à jour {version} ({SizeText(update.Installer.Size)})";
+                InstallUpdateButton.IsEnabled = true;
+                InstallUpdateButton.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                UpdateStatusText.Text += " Cette copie de LibreBooth n'a pas été installée avec le programme d'installation : "
+                                         + "téléchargez la nouvelle version sur GitHub.";
+            }
+            return;
+        }
+        UpdateStatusText.Text = _services.UpdateCheckError != null
+            ? "Recherche impossible : " + _services.UpdateCheckError
+            : _services.LastUpdateCheck is { } when
+                ? $"LibreBooth {App.Version} est à jour (vérifié {(when.Date == DateTime.Today ? $"aujourd'hui à {when:HH:mm}" : $"le {when:dd/MM/yyyy} à {when:HH:mm}")})."
+                : "Pas encore de recherche depuis le lancement de LibreBooth.";
+    }
+
+    private static string SizeText(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / (1024.0 * 1024):0} Mo" : $"{Math.Max(1, bytes / 1024)} Ko";
+
+    private void ShowUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        AdminTabs.SelectedItem = SystemTab;
+        Dispatcher.BeginInvoke(() => UpdatesGroup.BringIntoView(), DispatcherPriority.Loaded);
+    }
+
+    private async void CheckUpdates_Click(object sender, RoutedEventArgs e) => await _services.CheckForUpdatesAsync();
+
+    private void UpdatePage_Click(object sender, RoutedEventArgs e) => Shell.OpenUrl(_services.AvailableUpdate?.PageUrl ?? UpdateChecker.ReleasesPage);
+
+    /// <summary>
+    /// Télécharge la nouvelle version, contrôle son empreinte, lance son programme d'installation (Windows demande
+    /// l'autorisation), puis ferme LibreBooth pour qu'il puisse remplacer les fichiers.
+    /// </summary>
+    private async void InstallUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (_services.AvailableUpdate is not { } update || _updateDownload != null) return;
+        var version = update.Version.ToString(3);
+        var answer = MessageBox.Show(this,
+            $"Installer LibreBooth {version} ?\n\n"
+            + $"LibreBooth va télécharger la mise à jour ({SizeText(update.Installer.Size)}) et contrôler son empreinte, puis se fermer pour l'installer. "
+            + "Windows va demander l'autorisation d'installer.\n\n"
+            + "Vos photos, événements, réglages et pilotes sont gardés. À la fin, LibreBooth peut se rouvrir tout seul.",
+            "LibreBooth", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes) return;
+
+        CustomizationTab.Flush();
+        _services.Settings.Normalize();
+        _services.SaveSettings();
+        _updateDownload = new CancellationTokenSource();
+        ShowUpdateStatus();
+        InstallUpdateButton.IsEnabled = false;
+        UpdateProgress.Value = 0;
+        UpdateProgress.Visibility = Visibility.Visible;
+        UpdateStatusText.Text = $"Téléchargement de LibreBooth {version}…";
+        string installer;
+        try
+        {
+            var progress = new Progress<double>(p =>
+            {
+                UpdateProgress.Value = p;
+                UpdateStatusText.Text = $"Téléchargement de LibreBooth {version}… {p * 100:0} %";
+            });
+            installer = await _services.DownloadUpdateAsync(update, progress, _updateDownload.Token);
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Mise à jour non téléchargée");
+            EndUpdateDownload();
+            if (ex is not OperationCanceledException || IsVisible)
+            {
+                ShowError("La mise à jour n'a pas pu être téléchargée :\n" + (ex is HttpRequestException or TaskCanceledException
+                    ? "GitHub n'a pas pu être joint (connexion Internet coupée ?)."
+                    : ex.Message));
+            }
+            return;
+        }
+
+        UpdateStatusText.Text = "Mise à jour téléchargée et contrôlée. Windows demande l'autorisation d'installer…";
+        try
+        {
+            _services.LaunchUpdateInstaller(installer);
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            EndUpdateDownload();
+            ShowError("Mise à jour annulée : Windows n'a pas reçu l'autorisation d'installer. Vous pouvez réessayer.");
+            return;
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Programme de mise à jour impossible à lancer");
+            EndUpdateDownload();
+            ShowError("Le programme de mise à jour n'a pas pu démarrer :\n" + ex.Message);
+            return;
+        }
+
+        // Le programme d'installation attend que LibreBooth soit fermé pour remplacer ses fichiers.
+        _log.Information("Fermeture de LibreBooth pour installer la version {Version}", version);
+        QuitRequested = true;
+        Close();
+    }
+
+    private void EndUpdateDownload()
+    {
+        _updateDownload?.Dispose();
+        _updateDownload = null;
+        ShowUpdateStatus();
     }
 
     private void OpenDataFolder_Click(object sender, RoutedEventArgs e) => Shell.OpenFolder(_services.Paths.DataRoot);

@@ -42,6 +42,7 @@ public partial class App : Application
         Logging.Configure(paths.LogsFolder);
         Log.Information("Démarrage de LibreBooth {Version} (démo : {Demo}, données : {Data})", Version, options.Demo, paths.DataRoot);
         RegisterGlobalErrorHandlers();
+        WheelScrolling.Register();
 
         if (options.IsDiagnosticRun)
         {
@@ -73,6 +74,31 @@ public partial class App : Application
             return;
         }
 
+        // Lancement normal : le code PIN, puis le choix de l'événement (ouvrir ou créer), avant tout le reste.
+        // Après un plantage, LibreBooth repart directement sur le photobooth avec le même événement.
+        if (!options.IsCaptureRun && !options.IsRestart)
+        {
+            bool chosen;
+            try
+            {
+                chosen = BoothShell.AskPinAndEvent(paths);
+            }
+            catch (Exception ex)
+            {
+                Log.Fatal(ex, "Choix de l'événement impossible");
+                MessageBox.Show("LibreBooth n'a pas pu ouvrir la liste des événements :\n" + ex.Message + "\n\nDétails dans le journal : " + paths.LogsFolder,
+                    "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Error);
+                Shutdown(1);
+                return;
+            }
+            if (!chosen)
+            {
+                Log.Information("Code PIN ou événement non choisi au lancement : LibreBooth se ferme");
+                Shutdown(0);
+                return;
+            }
+        }
+
         try
         {
             Services = AppServices.Create(paths, options, Dispatcher);
@@ -88,8 +114,8 @@ public partial class App : Application
             }
 
             PowerManagement.KeepDisplayOn();
-            // Au lancement : le code PIN, puis l'admin seule (fenêtre normale). Le photobooth plein écran n'apparaît
-            // qu'avec « Démarrer le photobooth ». Après un plantage, LibreBooth repart directement sur le photobooth.
+            // Puis l'admin seule (fenêtre normale). Le photobooth plein écran n'apparaît qu'avec « Démarrer le photobooth ».
+            // Après un plantage, LibreBooth repart directement sur le photobooth.
             var shell = new BoothShell(Services, kiosk);
             Dispatcher.BeginInvoke(async () =>
             {

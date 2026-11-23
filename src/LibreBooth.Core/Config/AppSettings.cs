@@ -8,14 +8,6 @@ public enum CameraKind
     Demo,
 }
 
-public enum SmtpSecurity
-{
-    Auto,
-    StartTls,
-    SslOnConnect,
-    None,
-}
-
 /// <summary>Tous les réglages de LibreBooth, enregistrés dans config.json.</summary>
 public sealed class AppSettings
 {
@@ -23,10 +15,13 @@ public sealed class AppSettings
     public string AdminPin { get; set; } = "1234";
     public string? CurrentEventFolder { get; set; }
     public bool LaunchAtStartup { get; set; }
+    /// <summary>Au lancement, demande à GitHub s'il existe une nouvelle version (proposée ensuite dans l'admin).</summary>
+    public bool CheckForUpdates { get; set; } = true;
     public CameraSettings Camera { get; set; } = new();
     public PrintSettings Print { get; set; } = new();
     public ScreenSettings Screens { get; set; } = new();
-    public EmailSettings Email { get; set; } = new();
+    // L'envoi par e-mail (versions 1.0 à 1.6) a été retiré en 2.0.0 : la partie « Email » d'un ancien config.json
+    // est ignorée, puis effacée au prochain enregistrement (avec l'identifiant SMTP qu'elle pouvait contenir).
 
     /// <summary>Remet dans des bornes raisonnables les valeurs saisies à la main ou abîmées.</summary>
     public AppSettings Normalize()
@@ -34,7 +29,6 @@ public sealed class AppSettings
         Camera ??= new();
         Print ??= new();
         Screens ??= new();
-        Email ??= new();
         if (string.IsNullOrWhiteSpace(AdminPin) || AdminPin.Length < 4 || !AdminPin.All(char.IsDigit)) AdminPin = "1234";
 
         Camera.Rotation = Camera.Rotation switch { 90 or 180 or 270 => Camera.Rotation, _ => 0 };
@@ -51,13 +45,10 @@ public sealed class AppSettings
         Screens.PreviewMilliseconds = Math.Clamp(Screens.PreviewMilliseconds, 300, 5000);
         Screens.ChooseTimeoutSeconds = Math.Clamp(Screens.ChooseTimeoutSeconds, 10, 300);
         Screens.ReviewTimeoutSeconds = Math.Clamp(Screens.ReviewTimeoutSeconds, 10, 600);
-        Screens.EmailTimeoutSeconds = Math.Clamp(Screens.EmailTimeoutSeconds, 20, 600);
         Screens.ThanksSeconds = Math.Clamp(Screens.ThanksSeconds, 2, 60);
         Screens.ErrorSeconds = Math.Clamp(Screens.ErrorSeconds, 3, 120);
         Screens.RetakeLimit = Math.Clamp(Screens.RetakeLimit, 0, ScreenSettings.MaxRetakes);
         if (string.IsNullOrWhiteSpace(Screens.StartKey)) Screens.StartKey = "Space";
-
-        Email.SmtpPort = Math.Clamp(Email.SmtpPort, 1, 65535);
         return this;
     }
 }
@@ -122,7 +113,6 @@ public sealed class ScreenSettings
     public int PreviewMilliseconds { get; set; } = 1500;
     public int ChooseTimeoutSeconds { get; set; } = 30;
     public int ReviewTimeoutSeconds { get; set; } = 45;
-    public int EmailTimeoutSeconds { get; set; } = 90;
     public int ThanksSeconds { get; set; } = 6;
     public int ErrorSeconds { get; set; } = 10;
     /// <summary>Pointeur de la souris caché tant qu'elle ne bouge pas (il réapparaît dès qu'on la bouge).</summary>
@@ -130,24 +120,4 @@ public sealed class ScreenSettings
     public bool Topmost { get; set; } = true;
     /// <summary>Touche qui lance une session (bouton d'arcade USB qui imite un clavier).</summary>
     public string StartKey { get; set; } = "Space";
-}
-
-public sealed class EmailSettings
-{
-    public bool Enabled { get; set; }
-    public string SmtpHost { get; set; } = "smtp.gmail.com";
-    public int SmtpPort { get; set; } = 587;
-    public SmtpSecurity Security { get; set; } = SmtpSecurity.StartTls;
-    public string Username { get; set; } = "";
-    /// <summary>Mot de passe chiffré par Windows (DPAPI) : illisible sur un autre PC.</summary>
-    public string ProtectedPassword { get; set; } = "";
-    public string FromAddress { get; set; } = "";
-    public string FromName { get; set; } = "LibreBooth";
-    public string Subject { get; set; } = "Votre photo – {evenement}";
-    public string Body { get; set; } =
-        "Bonjour,\n\nVoici votre photo prise lors de {evenement}, le {date}.\n\nÀ très bientôt !";
-    public string ConsentText { get; set; } =
-        "Votre adresse sert uniquement à vous envoyer votre photo. Elle est effacée dès l'envoi.";
-    public bool RequireConsent { get; set; }
-    public bool AttachOriginals { get; set; }
 }

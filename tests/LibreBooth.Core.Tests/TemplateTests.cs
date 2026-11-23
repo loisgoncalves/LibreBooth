@@ -1,7 +1,6 @@
 using LibreBooth.Core.Design;
 using LibreBooth.Core.Hardware;
 using LibreBooth.Core.Layouts;
-using LibreBooth.Core.Sharing;
 using LibreBooth.Core.Util;
 using SkiaSharp;
 
@@ -118,35 +117,6 @@ public sealed class TemplateTests : IDisposable
 
         Assert.Single(library.LoadAll());
         Assert.Single(Directory.GetDirectories(Path.Combine(library.Root, "_corbeille")));
-    }
-}
-
-public sealed class EmailValidatorTests
-{
-    [Theory]
-    [InlineData("marie.dupont@gmail.com")]
-    [InlineData("a@b.fr")]
-    [InlineData("jean-luc_2026@orange.fr")]
-    public void Accepts_real_addresses(string address) => Assert.True(EmailValidator.IsValid(address));
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("marie")]
-    [InlineData("marie@")]
-    [InlineData("@gmail.com")]
-    [InlineData("marie@gmail")]
-    [InlineData("ma rie@gmail.com")]
-    [InlineData("marie@@gmail.com")]
-    [InlineData("marie..d@gmail.com")]
-    public void Rejects_broken_addresses(string address) => Assert.False(EmailValidator.IsValid(address));
-
-    [Fact]
-    public void Suggests_a_fix_for_common_typos()
-    {
-        Assert.Equal("marie@gmail.com", EmailValidator.Suggest("marie@gmial.com"));
-        Assert.Equal("paul@hotmail.fr", EmailValidator.Suggest("paul@hotmial.fr"));
-        Assert.Null(EmailValidator.Suggest("marie@gmail.com"));
-        Assert.Null(EmailValidator.Suggest("marie"));
     }
 }
 

@@ -11,13 +11,14 @@ using LibreBooth.Core.Design;
 using LibreBooth.Core.Hardware;
 using LibreBooth.Core.Layouts;
 using LibreBooth.Core.Session;
+using LibreBooth.Core.Updates;
 using Serilog;
 
 namespace LibreBooth.App.Diagnostics;
 
 /// <summary>
 /// Parcours de vérification automatique (LibreBooth.exe --captures &lt;dossier&gt;) : une vraie session complète
-/// en mode démo (choix du format, prise de vue, montage, impression PDF, e-mail, marque-page, erreur, admin),
+/// en mode démo (choix du format, prise de vue, montage, impression PDF, marque-page, erreur, admin),
 /// avec une image de chaque écran, les montages de chaque thème et un rapport. Aucune fenêtre n'est affichée.
 /// </summary>
 internal static class CaptureRunner
@@ -39,14 +40,11 @@ internal static class CaptureRunner
 
         try
         {
-            // Les deux modèles proposés pour passer par l'écran de choix, 3 exemplaires au plus,
-            // e-mail activé pour montrer le bouton.
+            // Les deux modèles proposés pour passer par l'écran de choix, 3 exemplaires au plus.
             services.Customization.Templates = services.Templates.LoadAll().Select(t => t.Id).ToList();
             services.Customization.MaxCopies = 3;
             services.Customization.Design.Phrase = "Merci d'être venus !";
             services.SaveCustomization();
-            services.Settings.Email.Enabled = true;
-            services.SaveSettings();
             kiosk.RefreshFromSettings();
 
             await WaitUntil(() => services.Camera.State == CameraState.Ready && kiosk.Attract.IsReady, 20, "appareil prêt");
@@ -84,17 +82,6 @@ internal static class CaptureRunner
             await Snap(kiosk, folder, "06-impression-lancee");
             Note($"Impressions PDF : {string.Join(", ", ListPdfs(session.Event.DemoPrintsFolder))}");
 
-            kiosk.OpenEmail();
-            await WaitUntil(() => kiosk.State == KioskState.Email, 5, "écran e-mail");
-            foreach (var character in "invite@gmial.com") kiosk.Email.KeyCommand.Execute(character.ToString());
-            await Snap(kiosk, folder, "07-email-avec-suggestion");
-            kiosk.Email.ApplySuggestionCommand.Execute(null);
-            Note($"Adresse corrigée par la suggestion : {kiosk.Email.Address}");
-            kiosk.Email.SendCommand.Execute(null);
-            await WaitUntil(() => kiosk.State == KioskState.Review, 5, "retour à la revue");
-            await Snap(kiosk, folder, "08-revue-email-enregistre");
-            Note($"E-mails en file d'attente : {services.Outbox.PendingCount}");
-
             kiosk.Finish();
             await WaitUntil(() => kiosk.State == KioskState.Thanks, 5, "écran de fin");
             await Snap(kiosk, folder, "09-merci");
@@ -128,9 +115,10 @@ internal static class CaptureRunner
             await SnapThemes(services, folder, Note);
             await SnapKioskThemes(services, kiosk, folder, Note);
             await SnapVersion14(services, kiosk, folder, Note);
+            await SnapVersion20(services, kiosk, folder, Note);
 
             var stats = services.CurrentEvent.Info.Stats;
-            Note($"Statistiques de l'événement : {stats.Sessions} sessions, {stats.Photos} photos, {stats.Prints} impressions, {stats.EmailsQueued} e-mail(s) en file, {stats.Retakes} série(s) recommencée(s)");
+            Note($"Statistiques de l'événement : {stats.Sessions} sessions, {stats.Photos} photos, {stats.Prints} impressions, {stats.Retakes} série(s) recommencée(s)");
             Note("RÉSULTAT : parcours complet réussi");
         }
         catch (Exception ex)
@@ -190,7 +178,7 @@ internal static class CaptureRunner
         foreach (var (index, name) in new[]
                  {
                      (0, "12-admin-evenement"), (1, "13-admin-personnalisation"), (3, "14-admin-impression"), (4, "15-admin-modeles"),
-                     (5, "17-admin-ecrans"), (8, "19-admin-systeme"),
+                     (5, "17-admin-ecrans"), (7, "19-admin-systeme"),
                  })
         {
             admin.AdminTabs.SelectedIndex = index;
@@ -279,6 +267,74 @@ internal static class CaptureRunner
         }
         booth.AllowClose();
         booth.Close();
+    }
+
+    /// <summary>
+    /// Nouveautés 2.0.0 : le choix de l'événement au lancement (liste remplie, puis vide) et depuis l'admin ; les mises à
+    /// jour dans l'admin (à jour, nouvelle version pour une copie installée, puis pour une copie décompressée).
+    /// </summary>
+    private static async Task SnapVersion20(AppServices services, KioskViewModel kiosk, string folder, Action<string> note)
+    {
+        await SnapUpdates(services, kiosk, folder, note);
+
+        // Un deuxième événement, avec la personnalisation du premier, pour que la liste montre plusieurs lignes.
+        var other = services.Events.FindSame("Anniversaire de Léa", new DateTime(2026, 12, 5))
+                    ?? services.Events.Create("Anniversaire de Léa", new DateTime(2026, 12, 5));
+        CustomizationStore.CopyFrom(services.CurrentEvent.Folder, other.Folder);
+
+        foreach (var (atStartup, events, name) in new[]
+                 {
+                     (true, services.Events, "24-choix-evenement-au-lancement"),
+                     (false, services.Events, "24b-changer-evenement-depuis-l-admin"),
+                     (true, new Core.Events.EventStore(Path.Combine(folder, "aucun-evenement")), "24c-choix-evenement-premier-lancement"),
+                 })
+        {
+            var chooser = new EventChooserWindow(events, services.CurrentEvent.Folder, atStartup);
+            chooser.LoadForCapture();
+            await Task.Delay(300);
+            if (chooser.Content is FrameworkElement content)
+            {
+                chooser.Content = null;
+                Render(content, Path.Combine(folder, name + ".png"), 1080, 720);
+            }
+            chooser.Close();
+        }
+        note("Choix de l'événement : " + string.Join(" | ", services.Events.ListAll().Select(e => $"{e.Name} → {Path.GetFileName(e.Folder)}")));
+        note("Dossier de l'événement en cours : " + string.Join(", ",
+            Directory.GetFileSystemEntries(services.CurrentEvent.Folder).Select(p => Path.GetFileName(p))));
+    }
+
+    private static async Task SnapUpdates(AppServices services, KioskViewModel kiosk, string folder, Action<string> note)
+    {
+        var page = new Uri("https://github.com/loisgoncalves/LibreBooth/releases/tag/v2.1.0");
+        var fake = new UpdateInfo(new Version(2, 1, 0), "v2.1.0",
+            UpdateChecker.ShortNotes("**Exemple de nouveautés** : texte publié avec la version sur GitHub.\n\n- Première nouveauté\n- Deuxième nouveauté\n\n## Télécharger\n\n- fichiers"),
+            page, new UpdateFile("LibreBooth-2.1.0-Installation.exe", new Uri(page, "LibreBooth-2.1.0-Installation.exe"), 66_477_360, null), null);
+        foreach (var (update, installed, name) in new (UpdateInfo?, bool, string)[]
+                 {
+                     (null, true, "25-mises-a-jour-a-jour"),
+                     (fake, true, "25b-mise-a-jour-disponible"),
+                     (fake, false, "25c-mise-a-jour-copie-decompressee"),
+                 })
+        {
+            AppServices.InstalledCopyForCapture = installed;
+            services.ShowUpdateForCapture(update);
+            var admin = new AdminWindow(services, kiosk);
+            admin.LoadForCapture();
+            admin.AdminTabs.SelectedItem = admin.SystemTab;
+            await Task.Delay(400);
+            if (admin.Content is FrameworkElement content)
+            {
+                admin.Content = null;
+                Render(content, Path.Combine(folder, name + ".png"), 1600, 1000);
+            }
+            note($"Mises à jour ({name}) : {admin.UpdateStatusText.Text} | bouton : "
+                 + (admin.InstallUpdateButton.Visibility == Visibility.Visible ? admin.InstallUpdateButton.Content : "aucun")
+                 + $" | bandeau : {(admin.UpdateBanner.Visibility == Visibility.Visible ? admin.UpdateBannerText.Text : "caché")}");
+            admin.CloseWithoutPrompt();
+        }
+        AppServices.InstalledCopyForCapture = null;
+        services.ShowUpdateForCapture(null);
     }
 
     /// <summary>Petite fenêtre (code PIN, choix) dessinée à sa taille naturelle.</summary>

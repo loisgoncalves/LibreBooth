@@ -60,11 +60,6 @@ public partial class ReviewView : UserControl
     public ReviewView() => InitializeComponent();
 }
 
-public partial class EmailView : UserControl
-{
-    public EmailView() => InitializeComponent();
-}
-
 public partial class ThanksView : UserControl
 {
     public ThanksView() => InitializeComponent();

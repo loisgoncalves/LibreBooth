@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Windows.Threading;
 using LibreBooth.App.Hardware;
@@ -11,7 +13,7 @@ using LibreBooth.Core.Design;
 using LibreBooth.Core.Events;
 using LibreBooth.Core.Hardware;
 using LibreBooth.Core.Layouts;
-using LibreBooth.Core.Sharing;
+using LibreBooth.Core.Updates;
 using LibreBooth.Core.Util;
 using Serilog;
 
@@ -23,8 +25,6 @@ public sealed class AppServices : IDisposable
     public const string DemoPrinterName = "Microsoft Print to PDF";
 
     private readonly ILogger _log = Log.ForContext<AppServices>();
-    private readonly CancellationTokenSource _shutdown = new();
-    private Task? _outboxLoop;
 
     private AppServices(AppPaths paths, StartupOptions options, Dispatcher dispatcher)
     {
@@ -36,7 +36,9 @@ public sealed class AppServices : IDisposable
         Settings = SettingsStore.Load();
 
         Events = new EventStore(paths.EventsFolder);
-        CurrentEvent = Events.Open(Settings.CurrentEventFolder) ?? Events.Create(null, DateTime.Today);
+        UpgradeOldEvents(Events, Settings);
+        // L'événement choisi au lancement (ou le dernier ouvert, après un plantage ou pour les vérifications).
+        CurrentEvent = Events.Open(Settings.CurrentEventFolder) ?? Events.ListAll().FirstOrDefault() ?? Events.Create(null, DateTime.Today);
         Settings.CurrentEventFolder = CurrentEvent.Folder;
 
         Templates = new TemplateLibrary(paths.TemplatesFolder);
@@ -47,7 +49,6 @@ public sealed class AppServices : IDisposable
         Printer = new WindowsPrinterService();
         AutoConfigurePrinter();
         PrinterMonitor = new PrinterMonitor(this);
-        Outbox = new EmailOutbox(Events, new SmtpEmailSender(() => Settings.Email), () => Settings.Email.Enabled);
         Camera = CreateCamera();
         SaveSettings();
     }
@@ -66,7 +67,6 @@ public sealed class AppServices : IDisposable
     public ICamera Camera { get; private set; }
     public IPrinterService Printer { get; }
     public PrinterMonitor PrinterMonitor { get; }
-    public EmailOutbox Outbox { get; }
     public KioskViewModel? Kiosk { get; set; }
 
     /// <summary>Nom de l'imprimante réellement utilisée (en démo : l'imprimante PDF de Windows).</summary>
@@ -81,16 +81,8 @@ public sealed class AppServices : IDisposable
     {
         Camera.Start();
         PrinterMonitor.Start();
-        _outboxLoop = Task.Run(() => Outbox.RunAsync(_shutdown.Token));
-        NetworkChange.NetworkAvailabilityChanged += OnNetworkAvailabilityChanged;
         PregeneratePreviewsInBackground();
-    }
-
-    private void OnNetworkAvailabilityChanged(object? sender, NetworkAvailabilityEventArgs e)
-    {
-        if (!e.IsAvailable) return;
-        _log.Information("Réseau disponible : relance des e-mails en attente");
-        Outbox.TriggerNow();
+        if (Settings.CheckForUpdates && !Options.IsCaptureRun) _ = CheckForUpdatesAtStartupAsync();
     }
 
     // ---------------------------------------------------------------- Appareil photo
@@ -265,6 +257,23 @@ public sealed class AppServices : IDisposable
 
     // ---------------------------------------------------------------- Événements
 
+    /// <summary>
+    /// Convertit les événements des versions 1.x au rangement de la 2.0.0 (Photos, Montages, dossier caché) et suit
+    /// le dossier de l'événement en cours s'il a été renommé.
+    /// </summary>
+    public static void UpgradeOldEvents(EventStore events, AppSettings settings) =>
+        settings.CurrentEventFolder = EventUpgrade.Follow(events.UpgradeOldEvents(), settings.CurrentEventFolder);
+
+    /// <summary>Renomme l'événement en cours ; son dossier suit. False si le dossier a dû garder son ancien nom.</summary>
+    public bool RenameCurrentEvent(string name, DateTime date)
+    {
+        var renamed = Events.Rename(CurrentEvent, name, date);
+        Settings.CurrentEventFolder = CurrentEvent.Folder;
+        SaveSettings();
+        _log.Information("Événement renommé : {Event} ({Date:dd.MM.yyyy})", CurrentEvent.Name, CurrentEvent.Date);
+        return renamed;
+    }
+
     public void OpenEvent(BoothEvent ev)
     {
         CurrentEvent = ev;
@@ -431,14 +440,133 @@ public sealed class AppServices : IDisposable
             }
         }
         PrinterMonitor.RefreshSoon(TimeSpan.Zero);
-        Outbox.TriggerNow();
         PregeneratePreviewsInBackground();
+    }
+
+    // ---------------------------------------------------------------- Mises à jour
+
+    /// <summary>Dossier du téléchargement des mises à jour (vidé au lancement suivant, et par la désinstallation).</summary>
+    public static string UpdateDownloadFolder => Path.Combine(Path.GetTempPath(), "LibreBooth-mise-a-jour");
+
+    /// <summary>Copie installée par le programme d'installation : elle peut se mettre à jour elle-même.</summary>
+    public static bool IsInstalledCopy => InstalledCopyForCapture ?? File.Exists(Path.Combine(AppContext.BaseDirectory, "fichiers-installes.txt"));
+
+    /// <summary>Captures de vérification : montre l'admin d'une copie installée (true) ou d'une copie décompressée (false).</summary>
+    internal static bool? InstalledCopyForCapture { get; set; }
+
+    /// <summary>Captures de vérification : une nouvelle version fictive, comme si GitHub l'avait annoncée.</summary>
+    internal void ShowUpdateForCapture(UpdateInfo? update)
+    {
+        AvailableUpdate = update;
+        LastUpdateCheck = DateTime.Now;
+        UpdateCheckError = null;
+        UpdateStatusChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public static Version CurrentVersion => UpdateChecker.TryParseVersion(App.Version, out var version) ? version : new Version(0, 0, 0);
+
+    /// <summary>Nouvelle version trouvée sur GitHub (null : à jour, ou pas encore cherché).</summary>
+    public UpdateInfo? AvailableUpdate { get; private set; }
+    public DateTime? LastUpdateCheck { get; private set; }
+    public string? UpdateCheckError { get; private set; }
+    public bool IsCheckingForUpdates { get; private set; }
+
+    /// <summary>Résultat de la recherche changé (toujours sur le fil de l'interface).</summary>
+    public event EventHandler? UpdateStatusChanged;
+
+    private Uri UpdateSource => Options.UpdateSource ?? UpdateChecker.LatestReleaseUri;
+
+    /// <summary>Recherche au lancement, quelques secondes après, si l'option est cochée (jamais pendant les vérifications).</summary>
+    private async Task CheckForUpdatesAtStartupAsync()
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        // Programme d'installation d'une mise à jour précédente : il a fini son travail.
+        try
+        {
+            if (!_downloadingUpdate && Directory.Exists(UpdateDownloadFolder)) Directory.Delete(UpdateDownloadFolder, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            _log.Debug(ex, "Ancien téléchargement de mise à jour gardé");
+        }
+        await CheckForUpdatesAsync();
+    }
+
+    /// <summary>Demande à GitHub la dernière version publiée. Sans Internet, rien n'est affiché au photobooth.</summary>
+    public async Task CheckForUpdatesAsync()
+    {
+        if (IsCheckingForUpdates) return;
+        IsCheckingForUpdates = true;
+        UpdateStatusChanged?.Invoke(this, EventArgs.Empty);
+        try
+        {
+            if (!NetworkInterface.GetIsNetworkAvailable()) throw new HttpRequestException("pas de connexion réseau");
+            using var http = UpdateChecker.CreateHttpClient(App.Version, TimeSpan.FromSeconds(20));
+            var latest = await UpdateChecker.GetLatestAsync(http, UpdateSource, CancellationToken.None);
+            AvailableUpdate = latest != null && UpdateChecker.IsNewer(latest, CurrentVersion) ? latest : null;
+            UpdateCheckError = null;
+            LastUpdateCheck = DateTime.Now;
+            _log.Information("Mises à jour : {Result}", AvailableUpdate != null
+                ? $"version {AvailableUpdate.Version.ToString(3)} disponible"
+                : $"LibreBooth {App.Version} est à jour (dernière publiée : {latest?.Version.ToString(3) ?? "aucune"})");
+        }
+        catch (Exception ex)
+        {
+            UpdateCheckError = ex is HttpRequestException or TaskCanceledException
+                ? "GitHub n'a pas pu être joint (pas de connexion Internet ?)."
+                : "Réponse de GitHub illisible.";
+            _log.Information("Recherche de mise à jour impossible : {Message}", ex.Message);
+        }
+        finally
+        {
+            IsCheckingForUpdates = false;
+            UpdateStatusChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    /// <summary>Télécharge le programme d'installation de la nouvelle version et contrôle son empreinte.</summary>
+    public async Task<string> DownloadUpdateAsync(UpdateInfo update, IProgress<double> progress, CancellationToken cancellation)
+    {
+        var folder = UpdateDownloadFolder;
+        _downloadingUpdate = true;
+        try
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, recursive: true);
+            using var http = UpdateChecker.CreateHttpClient(App.Version, TimeSpan.FromMinutes(30));
+            var installer = await UpdateDownloader.DownloadAsync(http, update, folder, progress, cancellation);
+            _log.Information("Mise à jour {Version} téléchargée et contrôlée : {File}", update.Version.ToString(3), installer);
+            return installer;
+        }
+        finally
+        {
+            _downloadingUpdate = false;
+        }
+    }
+
+    private bool _downloadingUpdate;
+
+    /// <summary>
+    /// Lance la mise à jour (Windows demande l'autorisation). Le programme d'installation attend que LibreBooth soit
+    /// fermé, installe la nouvelle version dans le même dossier, puis propose de relancer LibreBooth.
+    /// </summary>
+    /// <exception cref="System.ComponentModel.Win32Exception">Autorisation refusée (code 1223).</exception>
+    public void LaunchUpdateInstaller(string installer)
+    {
+        var folder = AppContext.BaseDirectory.TrimEnd('\\');
+        // Essai (fausse version publiée sur ce PC) : installation d'essai, sans droits d'administrateur.
+        var test = Options.UpdateSource != null;
+        var arguments = $"/mise-a-jour /dossier \"{folder}\"" + (test ? " /test" : "");
+        using var process = Process.Start(new ProcessStartInfo(installer, arguments)
+        {
+            UseShellExecute = true,
+            Verb = test ? "" : "runas",
+            WorkingDirectory = Path.GetDirectoryName(installer)!,
+        });
+        _log.Information("Programme de mise à jour lancé : {Installer} {Arguments}", installer, arguments);
     }
 
     public void Dispose()
     {
-        _shutdown.Cancel();
-        NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
         PrinterMonitor.Dispose();
         try
         {
@@ -447,14 +575,6 @@ public sealed class AppServices : IDisposable
         catch (Exception ex)
         {
             _log.Warning(ex, "Arrêt de l'appareil photo");
-        }
-        try
-        {
-            _outboxLoop?.Wait(TimeSpan.FromSeconds(2));
-        }
-        catch
-        {
-            // Boucle d'envoi arrêtée.
         }
         SaveSettings();
     }

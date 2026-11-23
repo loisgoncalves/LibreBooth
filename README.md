@@ -20,6 +20,8 @@ propres impressions, ses propres écrans et son propre dossier de photos.
 
 ## Ce que fait LibreBooth
 
+- **Un événement à la fois** : au lancement, LibreBooth propose d'ouvrir un événement ou d'en créer un nouveau, avec
+  le nom de votre choix. Chaque événement garde sa personnalisation (thème, textes, fonds, logo) et ses photos.
 - **Accueil plein écran** : « Touchez l'écran pour commencer », ou un bouton d'arcade USB qui imite une touche.
 - **Choix du format** : **10x15 une photo** ou **marque-page 3 photos** (imprimé deux fois sur un 10x15 que la DNP
   coupe en deux).
@@ -29,12 +31,13 @@ propres impressions, ses propres écrans et son propre dossier de photos.
 - **Écrans aux couleurs de l'événement**, avec une image d'accueil propre à chaque événement.
 - **Impression** sur la DNP : l'invité choisit ses exemplaires (jusqu'au maximum fixé pour l'événement).
 - **Recommencer** : l'invité refait sa série tant qu'il n'a rien imprimé ; la série refusée est gardée à part.
-- **Admin d'abord** : au lancement, le code PIN puis l'administration dans une fenêtre normale ; le photobooth plein
-  écran démarre avec « Démarrer le photobooth ». Un bouton rond sur l'accueil permet, avec le code PIN, de revenir
-  à l'admin ou de quitter.
+- **Admin d'abord** : au lancement, le code PIN, le choix de l'événement, puis l'administration dans une fenêtre
+  normale ; le photobooth plein écran démarre avec « Démarrer le photobooth ». Un bouton rond sur l'accueil permet,
+  avec le code PIN, de revenir à l'admin ou de quitter.
 - **Vérification de l'installation** : dossiers, fichiers, pilotes, imprimante et appareil photo, avec ce qu'il faut
   faire en cas de problème.
-- **Envoi par e-mail** (désactivé par défaut) : file d'attente qui part dès que le réseau revient.
+- **Mises à jour** : quand le PC est connecté à Internet, LibreBooth signale les nouvelles versions et les installe
+  depuis l'admin, jamais pendant le photobooth.
 - **Fiabilité** : chaque photo est écrite sur le disque dès son arrivée, l'appareil se reconnecte tout seul, une
   erreur affiche un message clair puis le photobooth repart, la mise en veille de Windows est bloquée.
 
@@ -59,7 +62,8 @@ propres impressions, ses propres écrans et son propre dossier de photos.
    `LibreBooth-x.y.z-SHA256.txt` donne leurs empreintes, pour vérifier le téléchargement.
 2. **Installez** : double-cliquez sur le programme d'installation. Il n'est pas signé par un éditeur : si Windows
    affiche « Windows a protégé votre ordinateur », cliquez **Informations complémentaires**, puis **Exécuter quand
-   même**. LibreBooth s'installe dans `C:\Program Files (x86)\LibreBooth`, avec ses raccourcis.
+   même**. LibreBooth s'installe dans `C:\Program Files (x86)\LibreBooth`, avec ses raccourcis. Déjà installé ?
+   Le programme d'installation met à jour la version en place (voir aussi [Mettre à jour](#au-quotidien)).
 3. **Pilotes des fabricants** : ils appartiennent à Canon et à DNP et ne peuvent pas être livrés avec LibreBooth.
    Le programme d'installation s'en occupe avec vous :
    - **Imprimante DNP DS620** : laissez cochée la case du pilote. Il est téléchargé sur le site officiel de DNP
@@ -77,23 +81,28 @@ propres impressions, ses propres écrans et son propre dossier de photos.
 4. **Vérifiez** : à la fin de l'installation, laissez cochée **« Vérifier que tout fonctionne »**, ou plus tard :
    menu Démarrer › LibreBooth › « Vérifier l'installation de LibreBooth ». Chaque point manquant est expliqué.
 
-Vos photos, événements et réglages sont dans `C:\Users\<nom>\LibreBooth`. Ils ne sont jamais effacés, ni par une
-mise à jour, ni par la désinstallation. Pas dans Documents : la protection « Accès contrôlé aux dossiers » de
-Windows y bloque les logiciels inconnus, et Documents est souvent synchronisé par OneDrive.
+Vos photos, événements et réglages sont dans `C:\Users\<nom>\LibreBooth`. Une mise à jour n'y touche jamais, et la
+désinstallation les garde, sauf si vous demandez leur suppression (voir [Désinstaller](#désinstaller)). Pas dans
+Documents : la protection « Accès contrôlé aux dossiers » de Windows y bloque les logiciels inconnus, et Documents
+est souvent synchronisé par OneDrive.
 
 ## Premier lancement
 
 1. Lancez **LibreBooth** : le code PIN est demandé (**1234** par défaut : changez-le tout de suite, onglet
-   Système), puis l'administration s'ouvre dans une fenêtre normale.
-2. Réglez l'événement :
-   - **Événement** : renommez « Mon événement » (ce nom est imprimé sur les photos) ;
+   Système).
+2. **Choisissez l'événement** : ouvrez un événement existant, ou créez-en un avec son **nom** (il peut apparaître
+   sur les photos), sa **date** et sa personnalisation de départ : le thème de LibreBooth, ou celle d'un autre
+   événement pour ne pas tout refaire.
+3. L'administration s'ouvre dans une fenêtre normale. Réglez l'événement :
    - **Personnalisation** : formats proposés, exemplaires, et le mode « Thème LibreBooth » ou « Mes propres images » ;
    - **Impression** : vérifiez que l'imprimante DNP est choisie (c'est automatique) ;
    - **Écrans** : textes, compte à rebours, délais, bouton « Recommencer » ;
-   - **Système** : code PIN, lancement au démarrage de Windows.
-3. Cliquez sur **« Démarrer le photobooth »**.
-4. Pendant l'événement, pour revenir à l'admin ou quitter : **bouton rond en bas à droite** de l'accueil, puis le code
+   - **Système** : code PIN, lancement au démarrage de Windows, mises à jour.
+4. Cliquez sur **« Démarrer le photobooth »**.
+5. Pendant l'événement, pour revenir à l'admin ou quitter : **bouton rond en bas à droite** de l'accueil, puis le code
    PIN. L'appui de 3 secondes dans le coin en haut à droite (ou `Ctrl+Maj+A`) mène aussi à l'admin.
+
+<p align="center"><img src="docs/images/choix-evenement.png" alt="Choix de l'événement au lancement" width="640"></p>
 
 <p align="center"><img src="docs/images/quitter-le-photobooth.png" alt="Revenir à l'admin ou quitter" width="320"></p>
 
@@ -153,16 +162,21 @@ le marque-page). Le pilote DNP lit la coupe dans un bloc de réglages qui lui es
 lui-même. Si vous réglez un format à la main (« Réglages du pilote… »), validez toujours la fenêtre du pilote par
 **OK**. Sur un rouleau 15x20, chaque 10x15 utilise une demi-feuille.
 
-**Envoi par e-mail** (facultatif, admin › E-mail) : serveur SMTP de votre messagerie (Gmail : `smtp.gmail.com`,
-port 587, STARTTLS, avec un « mot de passe d'application »). Le mot de passe est chiffré par Windows : il est
-illisible dans `config.json` et sur un autre PC. L'adresse de l'invité est effacée dès que l'e-mail est parti.
-
 ## Au quotidien
 
-- **Nouvel événement** : admin › Événement › « Créer et activer ». Chaque événement a son dossier
-  `C:\Users\<nom>\LibreBooth\Evenements\AAAA-MM-JJ_nom\` : `originaux` (photos de l'appareil), `montages` (photos
-  imprimées), `refusees` (séries recommencées), `personnalisation` (thème, fonds, logo).
+- **Changer d'événement** : au lancement de LibreBooth, ou admin › Événement › « Changer d'événement… ». Le même
+  onglet renomme l'événement (son dossier suit) et ouvre son dossier de photos.
+- **Dossier de l'événement** : `C:\Users\<nom>\LibreBooth\Evenements\2026-11-23 Mariage Julie et Tom\`, avec
+  `Photos` (photos de l'appareil), `Montages` (photos imprimées) et `Photos refusées` (séries recommencées). Ce dont
+  LibreBooth a besoin pour l'événement (personnalisation, fiches des sessions) est rangé à part, dans le dossier
+  caché `.librebooth`. Les événements des versions 1.x sont convertis au premier lancement de la 2.0.0, sans perdre
+  une photo.
 - **Réimprimer** une photo : admin › Événement › Galerie.
+- **Mettre à jour** : quand une nouvelle version est publiée, un bandeau l'annonce dans l'admin. Admin › Système ›
+  Mises à jour › **« Installer la mise à jour »** : LibreBooth la télécharge depuis GitHub, contrôle son empreinte
+  SHA-256, puis se ferme. Windows demande l'autorisation, la nouvelle version s'installe, et « Terminer » relance
+  LibreBooth. Photos, événements, réglages et pilotes sont gardés. Une copie décompressée depuis le zip (sans le
+  programme d'installation) ne se met pas à jour seule : l'admin donne le lien de la nouvelle version.
 - **Quitter** : bouton « Quitter LibreBooth » en bas de l'admin, ou bouton rond de l'accueil du photobooth (code PIN).
 - **Journal** : admin › Journal, ou `C:\Users\<nom>\LibreBooth\logs`.
 - **Diagnostic complet du matériel** (live view, photo de test), LibreBooth fermé :
@@ -170,6 +184,20 @@ illisible dans `config.json` et sur un autre PC. L'adresse de l'invité est effa
   ```powershell
   & "C:\Program Files (x86)\LibreBooth\LibreBooth.exe" --diagnostic
   ```
+
+## Désinstaller
+
+Paramètres de Windows › Applications › Applications installées › LibreBooth › Désinstaller, ou menu Démarrer ›
+LibreBooth › « Désinstaller LibreBooth ». Le programme, ses raccourcis et son inscription dans Windows sont retirés.
+Deux cases, au choix :
+
+- **« Supprimer aussi les réglages et les fichiers de LibreBooth »** : réglages, modèles, personnalisations des
+  événements, pilotes ajoutés (SDK Canon) et journaux ;
+- **« Supprimer aussi les photos de tous les événements »** (après confirmation) : tout le dossier `Evenements`.
+
+Sans case cochée, photos et réglages restent dans `C:\Users\<nom>\LibreBooth`, prêts pour une prochaine
+installation. Ce qui est supprimé part dans la **Corbeille** de Windows : on peut encore le récupérer. Le pilote de
+l'imprimante DNP reste installé.
 
 ## Dépannage
 
@@ -181,12 +209,15 @@ illisible dans `config.json` et sur un autre PC. L'adresse de l'invité est effa
 | La photo n'est pas prise | Objectif en MF, qualité en JPEG (pas RAW seul). |
 | Aucune imprimante DNP | Relancez le programme d'installation avec la case du pilote cochée (ou installez-le depuis le site de DNP), puis branchez la DNP en USB et allumez-la. |
 | Marque-pages non coupés | Admin › Impression › « Réglages automatiques DNP », puis une page de test. |
+| « GitHub n'a pas pu être joint » (mises à jour) | Pas d'Internet, ou réseau qui bloque GitHub. LibreBooth fonctionne sans ; une fois connecté : admin › Système › « Rechercher maintenant ». |
 | Autre chose | Menu Démarrer › LibreBooth › « Vérifier l'installation de LibreBooth », puis le journal (admin › Journal). |
 
 ## Données et vie privée
 
 LibreBooth fonctionne sans compte ni connexion : les photos restent sur le PC, dans le dossier de chaque
-événement. Rien n'est envoyé sur Internet, sauf les e-mails aux invités si vous activez cet envoi.
+événement, et rien n'est envoyé sur Internet. LibreBooth se connecte seulement à GitHub pour savoir si une nouvelle
+version existe (il ne transmet que son numéro de version ; case à décocher dans admin › Système › Mises à jour), et
+le programme d'installation télécharge le pilote de la DS620 sur le site de DNP.
 
 ## Compiler depuis les sources
 
@@ -210,6 +241,31 @@ dotnet run --project src\LibreBooth.App -- --demo --fenetre
 - `.\installer\fabriquer-installation.ps1 -Public` fabrique le programme d'installation, le zip et leurs empreintes
   dans `publish\github`, **sans aucun fichier de Canon ou de DNP**.
 - `--captures <dossier>` : parcours automatique en mode démo qui enregistre chaque écran en image.
+- `--source-mises-a-jour <adresse>` : autre adresse que GitHub pour essayer les mises à jour (même format que l'API
+  « releases » de GitHub ; `http` seulement sur le PC lui-même).
+
+**Sans l'appareil ni l'imprimante**, on peut modifier et vérifier presque tout : `dotnet test`, `--demo` et
+`--captures`. Ce qui touche au Canon, à l'état de la DNP ou à la coupe se valide ensuite sur le booth.
+
+### Numéros de version
+
+Un seul numéro pour tout LibreBooth, dans `Directory.Build.props` : **majeure.fonction.correctif** (par exemple
+2.1.3). C'est lui que les mises à jour comparent à la dernière version publiée.
+
+| Type | Exemple | Quand |
+|---|---|---|
+| `correctif` | 2.1.0 → 2.1.1 | correction d'un problème, sans nouveauté |
+| `fonction` | 2.1.1 → 2.2.0 | nouvelle fonction ou changement visible, sans rien casser |
+| `majeure` | 2.2.0 → 3.0.0 | changement qui modifie les habitudes ou les fichiers de l'utilisateur |
+
+```powershell
+.\installer\nouvelle-version.ps1 -Type correctif -Note "Correction de …"
+```
+
+Le script change le numéro et ajoute une entrée en haut de [`CHANGELOG.md`](CHANGELOG.md), à compléter.
+`fabriquer-installation.ps1` refuse ensuite d'écraser une version déjà fabriquée. Pour que LibreBooth trouve une
+nouvelle version, sa page Releases porte l'étiquette `vX.Y.Z` et les fichiers `LibreBooth-X.Y.Z-Installation.exe` et
+`LibreBooth-X.Y.Z-SHA256.txt` ; une version marquée « pre-release » est ignorée.
 
 ## Licence et crédits
 

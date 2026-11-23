@@ -18,7 +18,7 @@ public sealed class SettingsStoreTests : IDisposable
         settings.Camera.Rotation = 90;
         settings.Print.PrinterName = "DNP DS-RX1";
         settings.Print.DriverSettings["10x15"] = "AAEC";
-        settings.Email.Subject = "Coucou {evenement}";
+        settings.AdminPin = "2468";
 
         store.Save(settings);
         var loaded = store.Load();
@@ -26,7 +26,7 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal(90, loaded.Camera.Rotation);
         Assert.Equal("DNP DS-RX1", loaded.Print.PrinterName);
         Assert.Equal("AAEC", loaded.Print.DriverSettings["10x15"]);
-        Assert.Equal("Coucou {evenement}", loaded.Email.Subject);
+        Assert.Equal("2468", loaded.AdminPin);
     }
 
     [Fact]
@@ -65,18 +65,6 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal(10, settings.Print.AutoPrintCopies);
         Assert.Equal(0, settings.Camera.Rotation);
     }
-
-    [Fact]
-    public void Smtp_password_is_encrypted_and_readable_again()
-    {
-        var protectedValue = PasswordProtector.Protect("motdepasse-secret");
-
-        Assert.NotEqual("motdepasse-secret", protectedValue);
-        Assert.DoesNotContain("secret", protectedValue);
-        Assert.Equal("motdepasse-secret", PasswordProtector.Unprotect(protectedValue));
-        Assert.Equal("", PasswordProtector.Unprotect("pas-du-base64!"));
-        Assert.Equal("", PasswordProtector.Protect(""));
-    }
 }
 
 public sealed class EventStoreTests : IDisposable
@@ -92,11 +80,10 @@ public sealed class EventStoreTests : IDisposable
 
         var ev = store.Create("Mariage d'Élodie & Hugo", new DateTime(2026, 6, 20));
 
-        Assert.Equal("2026-06-20_mariage-d-elodie-hugo", Path.GetFileName(ev.Folder));
+        Assert.Equal("2026-06-20 Mariage d'Élodie & Hugo", Path.GetFileName(ev.Folder));
         Assert.True(Directory.Exists(ev.OriginalsFolder));
         Assert.True(Directory.Exists(ev.CompositesFolder));
-        Assert.True(Directory.Exists(ev.OutboxFolder));
-        Assert.True(File.Exists(Path.Combine(ev.Folder, "event.json")));
+        Assert.True(File.Exists(Path.Combine(ev.Folder, ".librebooth", "event.json")));
     }
 
     [Fact]
@@ -108,7 +95,7 @@ public sealed class EventStoreTests : IDisposable
         var second = store.Create("Anniversaire", new DateTime(2026, 6, 20));
 
         Assert.NotEqual(first.Folder, second.Folder);
-        Assert.EndsWith("-2", second.Folder);
+        Assert.EndsWith(" (2)", second.Folder);
     }
 
     [Fact]

@@ -96,4 +96,17 @@ internal static class Shell
             Log.Warning(ex, "Ouverture du dossier impossible : {Folder}", folder);
         }
     }
+
+    /// <summary>Page web dans le navigateur habituel.</summary>
+    public static void OpenUrl(Uri url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url.ToString()) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Ouverture de la page impossible : {Url}", url);
+        }
+    }
 }

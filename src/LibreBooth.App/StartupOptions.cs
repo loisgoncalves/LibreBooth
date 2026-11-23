@@ -32,6 +32,11 @@ public sealed class StartupOptions
     public bool PrintToFiles { get; private set; }
     /// <summary>--diagnostic --marque-page N : imprime seulement le marque-page de test, en N pages dans une même tâche.</summary>
     public int BookmarkPages { get; private set; }
+    /// <summary>
+    /// --source-mises-a-jour &lt;adresse&gt; : essai des mises à jour avec une fausse version publiée (sur ce PC). Le
+    /// programme d'installation est alors lancé en mode essai, sans droits d'administrateur.
+    /// </summary>
+    public Uri? UpdateSource { get; private set; }
 
     public static StartupOptions Parse(string[] args)
     {
@@ -58,6 +63,10 @@ public sealed class StartupOptions
                     break;
                 case "--materiel":
                     options.RealHardware = true;
+                    break;
+                case "--source-mises-a-jour" when i + 1 < args.Length && Uri.TryCreate(args[i + 1], UriKind.Absolute, out var source):
+                    options.UpdateSource = source;
+                    i++;
                     break;
                 case "--imprimer":
                     options.PrintTestPages = true;

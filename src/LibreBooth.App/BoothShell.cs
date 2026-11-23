@@ -4,6 +4,8 @@ using LibreBooth.App.Admin;
 using LibreBooth.App.Infrastructure;
 using LibreBooth.App.Kiosk;
 using LibreBooth.App.Services;
+using LibreBooth.Core.Config;
+using LibreBooth.Core.Events;
 using Serilog;
 
 namespace LibreBooth.App;
@@ -11,7 +13,7 @@ namespace LibreBooth.App;
 /// <summary>
 /// Les deux modes de LibreBooth et le passage de l'un à l'autre :
 /// <list type="bullet">
-/// <item>l'admin, dans une fenêtre normale, s'ouvre seule au lancement, après le code PIN ;</item>
+/// <item>au lancement : le code PIN, le choix de l'événement (ouvrir ou créer), puis l'admin dans une fenêtre normale ;</item>
 /// <item>le photobooth, en plein écran, n'apparaît qu'avec « Démarrer le photobooth » ;</item>
 /// <item>depuis le photobooth, revenir à l'admin ou quitter LibreBooth demande le code PIN.</item>
 /// </list>
@@ -30,6 +32,28 @@ internal sealed class BoothShell
         _kiosk = kiosk;
     }
 
+    /// <summary>
+    /// Au lancement, avant de démarrer l'appareil et l'imprimante : le code PIN, puis le choix de l'événement (ouvrir un
+    /// événement existant ou en créer un). Le choix est enregistré dans la configuration, où les services le reprennent.
+    /// </summary>
+    /// <returns>false si l'opérateur renonce : LibreBooth se ferme.</returns>
+    public static bool AskPinAndEvent(AppPaths paths)
+    {
+        var store = new SettingsStore(paths.ConfigFile);
+        var settings = store.Load();
+        var hint = settings.AdminPin == "1234" ? "Code par défaut : 1234 (à changer dans l'onglet Système)" : null;
+        var pin = new PinWindow(settings.AdminPin, "Code administrateur", hint, standalone: true);
+        if (pin.ShowDialog() != true) return false;
+
+        var events = new EventStore(paths.EventsFolder);
+        AppServices.UpgradeOldEvents(events, settings);
+        var chooser = new EventChooserWindow(events, settings.CurrentEventFolder, atStartup: true);
+        if (chooser.ShowDialog() != true || chooser.Chosen is not { } chosen) return false;
+        settings.CurrentEventFolder = chosen.Folder;
+        store.Save(settings);
+        return true;
+    }
+
     /// <param name="restartAfterCrash">
     /// Relance automatique après un plantage : on repart directement sur le photobooth, les invités attendent
     /// (et l'admin n'est pas laissée ouverte sans code devant eux).
@@ -43,14 +67,8 @@ internal sealed class BoothShell
             return;
         }
 
+        // Le code PIN et l'événement ont été demandés juste avant (AskPinAndEvent).
         await _kiosk.PauseForAdminAsync();
-        var hint = _services.Settings.AdminPin == "1234" ? "Code par défaut : 1234 (à changer dans l'onglet Système)" : null;
-        if (!AskPin(null, "Code administrateur", hint))
-        {
-            _log.Information("Code PIN non saisi au lancement : LibreBooth se ferme");
-            Quit();
-            return;
-        }
         await RunAdminAsync();
     }
 

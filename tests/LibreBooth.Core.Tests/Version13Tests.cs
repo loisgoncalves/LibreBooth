@@ -36,7 +36,7 @@ public sealed class RetakeTests : IDisposable
         Assert.False(sm.ShotCompleted());
         Assert.True(sm.ShotCompleted());
         Assert.True(sm.CompositionReady());
-        Assert.True(sm.OpenEmail());
+        Assert.True(sm.Finish());
         Assert.False(sm.Retake());
     }
 
