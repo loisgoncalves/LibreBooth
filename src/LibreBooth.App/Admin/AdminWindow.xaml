@@ -299,14 +299,14 @@
                 <ScrollViewer x:Name="CameraPage" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
                     <infra:PagePanel Style="{StaticResource PageContent}">
                         <TextBlock Text="Appareil photo" Style="{StaticResource PageTitle}" />
-                        <TextBlock Text="L'appareil utilisé, son pilote (SDK Canon), un essai et ses réglages." Style="{StaticResource PageSubtitle}" />
+                        <TextBlock Text="L'appareil utilisé, son pilote, un essai et ses réglages." Style="{StaticResource PageSubtitle}" />
 
                         <GroupBox Header="Appareil utilisé">
                             <StackPanel>
                                 <WrapPanel>
                                     <RadioButton x:Name="CanonRadio" Style="{StaticResource ChoiceCard}" GroupName="CameraKind" Checked="CameraKind_Changed"
                                                  Content="Canon EOS" infra:AdminUi.Glyph="&#xE722;" MinWidth="300"
-                                                 infra:AdminUi.Description="Piloté par le SDK Canon (EDSDK)." />
+                                                 infra:AdminUi.Description="Reflex ou hybride Canon, branché en USB." />
                                     <RadioButton x:Name="DemoRadio" Style="{StaticResource ChoiceCard}" GroupName="CameraKind" Checked="CameraKind_Changed"
                                                  Content="Appareil de démonstration" infra:AdminUi.Glyph="&#xE8B9;" MinWidth="300"
                                                  infra:AdminUi.Description="Images d'exemple, pour essayer sans appareil." />
@@ -318,7 +318,21 @@
                             </StackPanel>
                         </GroupBox>
 
-                        <GroupBox Header="SDK Canon (pilote de l'appareil photo)">
+                        <GroupBox x:Name="CameraDriverGroup" Header="Pilote du Canon">
+                            <StackPanel>
+                                <WrapPanel>
+                                    <RadioButton x:Name="WindowsDriverRadio" Style="{StaticResource ChoiceCard}" GroupName="CameraDriver" Checked="CameraDriver_Changed"
+                                                 Content="Pilote de Windows" infra:AdminUi.Glyph="&#xE88E;" MinWidth="300"
+                                                 infra:AdminUi.Description="Conseillé : intégré à Windows, rien à installer." />
+                                    <RadioButton x:Name="SdkDriverRadio" Style="{StaticResource ChoiceCard}" GroupName="CameraDriver" Checked="CameraDriver_Changed"
+                                                 Content="SDK Canon (secours)" infra:AdminUi.Glyph="&#xE943;" MinWidth="300"
+                                                 infra:AdminUi.Description="Si Windows ne sait pas piloter votre modèle. À télécharger chez Canon." />
+                                </WrapPanel>
+                                <TextBlock x:Name="CameraDriverHelp" Style="{StaticResource Help}" Margin="0" />
+                            </StackPanel>
+                        </GroupBox>
+
+                        <GroupBox x:Name="CanonSdkGroup" Header="SDK Canon (pilote de secours)">
                             <StackPanel>
                                 <TextBlock x:Name="CanonSdkText" Style="{StaticResource Value}" FontWeight="SemiBold" />
                                 <TextBlock x:Name="CanonSdkHelp" Style="{StaticResource Help}" />
@@ -353,9 +367,6 @@
                                 </infra:SettingRow>
                                 <infra:SettingRow Title="Autofocus avant chaque photo" Description="Déconseillé : la mise au point manuelle est plus fiable.">
                                     <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding Camera.UseAutofocus}" />
-                                </infra:SettingRow>
-                                <infra:SettingRow Title="Copie sur la carte SD" Description="Enregistre aussi chaque photo sur la carte SD de l'appareil, en secours.">
-                                    <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding Camera.SaveToCardToo}" />
                                 </infra:SettingRow>
                                 <infra:SettingRow Title="Rotation de l'appareil" Description="Sur son support, en degrés.">
                                     <ComboBox x:Name="RotationCombo" Width="140" Margin="0" SelectedItem="{Binding Camera.Rotation}" />
@@ -596,7 +607,20 @@
                                 <infra:SettingRow Title="Rechercher les nouvelles versions au lancement" Description="Quand le PC est connecté à Internet.">
                                     <CheckBox Style="{StaticResource Switch}" IsChecked="{Binding CheckForUpdates}" />
                                 </infra:SettingRow>
+                                <infra:SettingRow Title="Proposer aussi les pré-versions"
+                                                  Description="Versions d'essai, pas encore validées sur un booth : elles peuvent contenir des erreurs. Pour vos essais, jamais juste avant un événement.">
+                                    <CheckBox x:Name="PrereleasesSwitch" Style="{StaticResource Switch}" Checked="Prereleases_Changed" Unchecked="Prereleases_Changed"
+                                              AutomationProperties.Name="Proposer aussi les pré-versions" />
+                                </infra:SettingRow>
                                 <TextBlock x:Name="UpdateStatusText" Style="{StaticResource Value}" FontWeight="SemiBold" />
+                                <!-- Pré-version trouvée : mise en garde avant de l'installer -->
+                                <Border x:Name="PrereleaseWarning" Style="{StaticResource WarningBar}" Visibility="Collapsed" Margin="0,4,0,8">
+                                    <DockPanel>
+                                        <TextBlock Text="&#xE7BA;" FontFamily="{DynamicResource IconFont}" FontSize="18" Foreground="{DynamicResource Admin.Warning}"
+                                                   VerticalAlignment="Top" Margin="0,1,12,0" />
+                                        <TextBlock x:Name="PrereleaseWarningText" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </Border>
                                 <TextBlock x:Name="UpdateNotesText" Style="{StaticResource Help}" Visibility="Collapsed" Margin="16,2,0,8" />
                                 <ProgressBar x:Name="UpdateProgress" Width="460" HorizontalAlignment="Left" Minimum="0" Maximum="1"
                                              Visibility="Collapsed" Margin="0,6,0,8" />
@@ -607,6 +631,19 @@
                                     <Button x:Name="UpdatePageButton" Content="Voir les nouveautés sur GitHub" infra:AdminUi.Glyph="&#xE8A7;" Click="UpdatePage_Click"
                                             Visibility="Collapsed" />
                                 </WrapPanel>
+                                <!-- Pré-version installée : retour à la dernière version stable -->
+                                <Border x:Name="ReturnToStablePanel" Style="{StaticResource WarningBar}" Visibility="Collapsed" Margin="0,10,0,8">
+                                    <DockPanel>
+                                        <TextBlock Text="&#xE7BA;" FontFamily="{DynamicResource IconFont}" FontSize="18" Foreground="{DynamicResource Admin.Warning}"
+                                                   VerticalAlignment="Top" Margin="0,1,12,0" />
+                                        <StackPanel>
+                                            <TextBlock x:Name="ReturnToStableText" TextWrapping="Wrap" />
+                                            <WrapPanel Margin="0,8,0,0">
+                                                <Button x:Name="ReturnToStableButton" infra:AdminUi.Glyph="&#xE7A7;" Click="ReturnToStable_Click" Margin="0" />
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
                                 <TextBlock Style="{StaticResource Help}"
                                            Text="Une mise à jour s'installe seulement d'ici, jamais pendant le photobooth. LibreBooth télécharge la nouvelle version depuis GitHub, contrôle son empreinte (SHA-256), puis se ferme : Windows demande l'autorisation, et la nouvelle version remplace l'ancienne. Photos, événements, réglages et pilotes sont gardés." />
                             </StackPanel>
@@ -628,7 +665,7 @@
                                     </TextBlock>
                                     <TextBlock Style="{StaticResource Value}" Text="Logiciel de photobooth gratuit, sans licence ni abonnement. © 2026 Loïs Gonçalves." />
                                     <TextBlock Style="{StaticResource Help}"
-                                               Text="Avec les bibliothèques libres .NET et WPF, SkiaSharp, CommunityToolkit.Mvvm et Serilog. Les pilotes Canon (EDSDK) et DNP (cspstat.dll) appartiennent à leurs fabricants." />
+                                               Text="Avec les bibliothèques libres .NET et WPF, SkiaSharp, CommunityToolkit.Mvvm et Serilog. Le SDK Canon (EDSDK, facultatif) et l'API d'état DNP (cspstat.dll) appartiennent à leurs fabricants." />
                                     <TextBlock x:Name="ModeText" Style="{StaticResource Value}" />
                                     <TextBlock x:Name="DataFolderText" Style="{StaticResource Value}" />
                                     <WrapPanel>

@@ -88,10 +88,7 @@ public sealed class AppServices : IDisposable
 
     // ---------------------------------------------------------------- Appareil photo
 
-    private ICamera CreateCamera() =>
-        Options.Demo || Settings.Camera.Kind == CameraKind.Demo
-            ? new DemoCamera()
-            : new CanonCamera(() => Settings.Camera);
+    private ICamera CreateCamera() => CameraFactory.Create(() => Settings.Camera, Options.Demo);
 
     /// <summary>
     /// Ajoute le SDK Canon (zip téléchargé chez Canon) dans le dossier « Pilotes ». Renvoie la version d'EDSDK.dll.
@@ -109,7 +106,7 @@ public sealed class AppServices : IDisposable
     public void RestartCamera()
     {
         if (Camera is DemoCamera) return;
-        // Le SDK Canon est commun à tout le programme : l'ancien appareil le libère avant que le nouveau ne le démarre.
+        // Un seul pilote à la fois peut tenir l'appareil : l'ancien le libère avant que le nouveau ne démarre.
         Camera.Dispose();
         Camera = CreateCamera();
         _log.Information("Appareil photo relancé : {Camera}", Camera.Name);
@@ -117,18 +114,21 @@ public sealed class AppServices : IDisposable
         CameraChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>Remplace l'appareil si le type choisi dans l'admin a changé (Canon ↔ démo).</summary>
+    /// <summary>Remplace l'appareil si le choix de l'admin a changé (démo, Canon par le pilote de Windows ou par le SDK).</summary>
     public void SwitchCameraIfNeeded()
     {
-        var wantDemo = Options.Demo || Settings.Camera.Kind == CameraKind.Demo;
-        if (Camera is DemoCamera == wantDemo) return;
+        var wanted = CameraFactory.TypeFor(Settings.Camera, Options.Demo);
+        if (Camera.GetType() == wanted) return;
 
         var previous = Camera;
+        // Les deux pilotes Canon ne peuvent pas tenir l'appareil en même temps : l'ancien le libère d'abord.
+        var betweenCanonDrivers = previous is not DemoCamera && wanted != typeof(DemoCamera);
+        if (betweenCanonDrivers) previous.Dispose();
         Camera = CreateCamera();
-        _log.Information("Changement d'appareil : {Camera}", Camera.Name);
+        _log.Information("Changement d'appareil : {Camera} ({Type})", Camera.Name, wanted.Name);
         Camera.Start();
         CameraChanged?.Invoke(this, EventArgs.Empty);
-        previous.Dispose();
+        if (!betweenCanonDrivers) previous.Dispose();
     }
 
     // ---------------------------------------------------------------- Modèles et personnalisation
@@ -465,10 +465,14 @@ public sealed class AppServices : IDisposable
     /// <summary>Captures de vérification : place libre simulée sur le disque des photos (null : le vrai disque).</summary>
     internal static long? FreeDiskBytesForCapture { get; set; }
 
-    /// <summary>Captures de vérification : une nouvelle version fictive, comme si GitHub l'avait annoncée.</summary>
-    internal void ShowUpdateForCapture(UpdateInfo? update)
+    /// <summary>
+    /// Captures de vérification : une nouvelle version fictive, comme si GitHub l'avait annoncée, et la version stable à
+    /// laquelle revenir depuis une pré-version.
+    /// </summary>
+    internal void ShowUpdateForCapture(UpdateInfo? update, UpdateInfo? stableToReturnTo = null)
     {
         AvailableUpdate = update;
+        StableToReturnTo = stableToReturnTo;
         LastUpdateCheck = DateTime.Now;
         UpdateCheckError = null;
         UpdateStatusChanged?.Invoke(this, EventArgs.Empty);
@@ -476,16 +480,37 @@ public sealed class AppServices : IDisposable
 
     public static Version CurrentVersion => UpdateChecker.TryParseVersion(App.Version, out var version) ? version : new Version(0, 0, 0);
 
-    /// <summary>Nouvelle version trouvée sur GitHub (null : à jour, ou pas encore cherché).</summary>
-    public UpdateInfo? AvailableUpdate { get; private set; }
+    /// <summary>
+    /// Nouvelle version trouvée sur GitHub, pré-version comprise si l'admin le demande (null : à jour, ou pas encore
+    /// cherché). Une pré-version n'est jamais proposée quand le réglage est coupé, même avant la recherche suivante.
+    /// </summary>
+    public UpdateInfo? AvailableUpdate
+    {
+        get => _availableUpdate is { IsPrerelease: true } && !Settings.IncludePrereleases ? null : _availableUpdate;
+        private set => _availableUpdate = value;
+    }
+
+    private UpdateInfo? _availableUpdate;
+
+    /// <summary>
+    /// Dernière version stable, quand LibreBooth est plus récent qu'elle (une pré-version est installée) : l'admin propose
+    /// d'y revenir. Null sinon, ou pas encore cherché.
+    /// </summary>
+    public UpdateInfo? StableToReturnTo { get; private set; }
+
     public DateTime? LastUpdateCheck { get; private set; }
     public string? UpdateCheckError { get; private set; }
     public bool IsCheckingForUpdates { get; private set; }
 
+    /// <summary>Réglage des pré-versions changé pendant une recherche : on recommence à la fin.</summary>
+    private bool _checkAgain;
+
     /// <summary>Résultat de la recherche changé (toujours sur le fil de l'interface).</summary>
     public event EventHandler? UpdateStatusChanged;
 
-    private Uri UpdateSource => Options.UpdateSource ?? UpdateChecker.LatestReleaseUri;
+    /// <summary>La dernière version stable, ou toutes les dernières versions quand les pré-versions sont demandées.</summary>
+    private Uri UpdateSource => Options.UpdateSource
+                                ?? (Settings.IncludePrereleases ? UpdateChecker.ReleasesUri : UpdateChecker.LatestReleaseUri);
 
     /// <summary>Recherche au lancement, quelques secondes après, si l'option est cochée (jamais pendant les vérifications).</summary>
     private async Task CheckForUpdatesAtStartupAsync()
@@ -503,23 +528,37 @@ public sealed class AppServices : IDisposable
         await CheckForUpdatesAsync();
     }
 
-    /// <summary>Demande à GitHub la dernière version publiée. Sans Internet, rien n'est affiché au photobooth.</summary>
+    /// <summary>
+    /// Demande à GitHub la dernière version publiée (et les pré-versions, si l'admin le demande). Sans Internet, rien
+    /// n'est affiché au photobooth.
+    /// </summary>
     public async Task CheckForUpdatesAsync()
     {
-        if (IsCheckingForUpdates) return;
+        if (IsCheckingForUpdates)
+        {
+            _checkAgain = true;
+            return;
+        }
         IsCheckingForUpdates = true;
+        _checkAgain = false;
         UpdateStatusChanged?.Invoke(this, EventArgs.Empty);
         try
         {
             if (!NetworkInterface.GetIsNetworkAvailable()) throw new HttpRequestException("pas de connexion réseau");
+            var prereleases = Settings.IncludePrereleases;
             using var http = UpdateChecker.CreateHttpClient(App.Version, TimeSpan.FromSeconds(20));
-            var latest = await UpdateChecker.GetLatestAsync(http, UpdateSource, CancellationToken.None);
-            AvailableUpdate = latest != null && UpdateChecker.IsNewer(latest, CurrentVersion) ? latest : null;
+            var releases = await UpdateChecker.GetReleasesAsync(http, UpdateSource, CancellationToken.None);
+            var choice = UpdateChecker.Choose(releases, CurrentVersion, prereleases);
+            AvailableUpdate = choice.Update;
+            StableToReturnTo = choice.ReturnToStable;
             UpdateCheckError = null;
             LastUpdateCheck = DateTime.Now;
-            _log.Information("Mises à jour : {Result}", AvailableUpdate != null
-                ? $"version {AvailableUpdate.Version.ToString(3)} disponible"
-                : $"LibreBooth {App.Version} est à jour (dernière publiée : {latest?.Version.ToString(3) ?? "aucune"})");
+            var found = AvailableUpdate != null
+                ? $"{(AvailableUpdate.IsPrerelease ? "pré-version" : "version")} {AvailableUpdate.Version.ToString(3)} disponible"
+                : $"LibreBooth {App.Version} est à jour";
+            _log.Information("Mises à jour : {Result} (dernière version stable : {Stable} ; pré-versions {Prereleases}){Return}", found,
+                choice.LatestStable?.Version.ToString(3) ?? "aucune", prereleases ? "proposées" : "non proposées",
+                StableToReturnTo != null ? " ; version installée plus récente que la dernière version stable" : "");
         }
         catch (Exception ex)
         {
@@ -533,6 +572,8 @@ public sealed class AppServices : IDisposable
             IsCheckingForUpdates = false;
             UpdateStatusChanged?.Invoke(this, EventArgs.Empty);
         }
+        // Réglage des pré-versions changé pendant la recherche : on recommence avec le nouveau réglage.
+        if (_checkAgain) await CheckForUpdatesAsync();
     }
 
     /// <summary>Télécharge le programme d'installation de la nouvelle version et contrôle son empreinte.</summary>

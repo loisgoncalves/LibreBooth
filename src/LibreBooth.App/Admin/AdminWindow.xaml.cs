@@ -146,6 +146,9 @@ public partial class AdminWindow : Window
     /// <summary>Chargement des pages sans afficher la fenêtre (captures de vérification).</summary>
     internal void LoadForCapture() => LoadAll();
 
+    /// <summary>La liste « Prêt pour l'événement ? » affichée (captures de vérification).</summary>
+    internal IReadOnlyList<ReadinessItem> ReadinessItemsForCapture => _readinessItems;
+
     private void LoadAll()
     {
         LoadEventTab();
@@ -334,6 +337,7 @@ public partial class AdminWindow : Window
         {
             DemoMode = _services.Options.Demo,
             CameraKind = settings.Camera.Kind,
+            CameraDriver = settings.Camera.Driver,
             CanonSdkMissing = _canonSdkMissing && settings.Camera.Kind == CameraKind.Canon,
             CameraState = camera.State,
             CameraName = camera.Name,
@@ -354,6 +358,9 @@ public partial class AdminWindow : Window
             FreeDiskBytes = _freeDiskBytes,
             DiskName = _diskName,
             AvailableUpdate = _services.AvailableUpdate?.Version.ToString(3),
+            AvailableUpdateIsPrerelease = _services.AvailableUpdate?.IsPrerelease == true,
+            CurrentVersion = App.Version,
+            StableToReturnTo = _services.StableToReturnTo?.Version.ToString(3),
         };
     }
 
@@ -403,7 +410,7 @@ public partial class AdminWindow : Window
     private string CameraChipLabel()
     {
         if (_services.Options.Demo || _services.Settings.Camera.Kind == CameraKind.Demo) return "Appareil de démonstration";
-        if (_canonSdkMissing) return "SDK Canon manquant";
+        if (_canonSdkMissing && _services.Settings.Camera.Driver == CameraDriver.CanonSdk) return "SDK Canon manquant";
         var camera = _services.Camera;
         return camera.State switch
         {
@@ -559,11 +566,29 @@ public partial class AdminWindow : Window
         _loading = true;
         CanonRadio.IsChecked = _services.Settings.Camera.Kind == CameraKind.Canon;
         DemoRadio.IsChecked = _services.Settings.Camera.Kind == CameraKind.Demo;
+        WindowsDriverRadio.IsChecked = _services.Settings.Camera.Driver == CameraDriver.Windows;
+        SdkDriverRadio.IsChecked = _services.Settings.Camera.Driver == CameraDriver.CanonSdk;
         _loading = false;
         CameraModeHelp.Text = _services.Options.Demo
             ? "LibreBooth a été lancé avec --demo : l'appareil de démonstration est utilisé quel que soit ce choix."
             : "Le changement est immédiat. L'appareil Canon se reconnecte tout seul s'il est débranché puis rebranché.";
         UpdateCanonSdkTexts();
+        UpdateCameraDriverPanels();
+    }
+
+    /// <summary>Le choix du pilote ne concerne que le Canon ; la partie « SDK Canon », que le pilote de secours.</summary>
+    private void UpdateCameraDriverPanels()
+    {
+        var camera = _services.Settings.Camera;
+        var canon = camera.Kind == CameraKind.Canon;
+        var sdk = camera.Driver == CameraDriver.CanonSdk;
+        CameraDriverGroup.Visibility = canon ? Visibility.Visible : Visibility.Collapsed;
+        CanonSdkGroup.Visibility = canon && sdk ? Visibility.Visible : Visibility.Collapsed;
+        CameraDriverHelp.Text = sdk
+            ? "Le SDK Canon ne sert qu'en secours, si le pilote de Windows ne sait pas piloter votre appareil. Il appartient "
+              + "à Canon : il faut le télécharger chez Canon (inscription gratuite), puis l'ajouter ci-dessous."
+            : "Rien à installer : le pilote de Windows pilote les Canon EOS (essayé avec le 1300D). Si votre appareil "
+              + "n'est pas reconnu, essayez le SDK Canon.";
     }
 
     /// <summary>Le SDK Canon ne peut pas être livré avec LibreBooth : on indique s'il est là, et comment l'ajouter.</summary>
@@ -583,7 +608,7 @@ public partial class AdminWindow : Window
         }
         else
         {
-            CanonSdkText.Text = "SDK Canon manquant : sans lui, LibreBooth ne peut pas piloter l'appareil photo.";
+            CanonSdkText.Text = "SDK Canon manquant : ajoutez-le, ou revenez au « Pilote de Windows » ci-dessus.";
             CanonSdkText.SetResourceReference(TextBlock.ForegroundProperty, "Admin.Error");
             CanonSdkHelp.Text = "Il appartient à Canon et ne peut pas être fourni avec LibreBooth. 1. Ouvrez la page Canon, "
                                 + "inscrivez-vous (gratuit) et téléchargez le SDK « EDSDK » pour Windows. 2. Indiquez le fichier "
@@ -649,6 +674,17 @@ public partial class AdminWindow : Window
         StopLiveTest();
         _services.Settings.Camera.Kind = DemoRadio.IsChecked == true ? CameraKind.Demo : CameraKind.Canon;
         _services.SwitchCameraIfNeeded();
+        UpdateCameraDriverPanels();
+        RefreshLiveStatus();
+    }
+
+    private void CameraDriver_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        StopLiveTest();
+        _services.Settings.Camera.Driver = SdkDriverRadio.IsChecked == true ? CameraDriver.CanonSdk : CameraDriver.Windows;
+        _services.SwitchCameraIfNeeded();
+        UpdateCameraDriverPanels();
         RefreshLiveStatus();
     }
 
@@ -956,6 +992,7 @@ public partial class AdminWindow : Window
         _loading = true;
         AppearanceLightRadio.IsChecked = _services.Settings.AdminAppearance == AdminAppearance.Light;
         AppearanceDarkRadio.IsChecked = _services.Settings.AdminAppearance == AdminAppearance.Dark;
+        PrereleasesSwitch.IsChecked = _services.Settings.IncludePrereleases;
         _loading = false;
         VersionText.Text = $"LibreBooth {App.Version}";
         ModeText.Text = _services.Options.Demo ? "Mode démo (lancé avec --demo)" : "Mode normal";
@@ -986,8 +1023,15 @@ public partial class AdminWindow : Window
         var update = _services.AvailableUpdate;
         var downloading = _updateDownload != null;
         UpdateBanner.Visibility = update != null && !downloading ? Visibility.Visible : Visibility.Collapsed;
-        if (update != null) UpdateBannerText.Text = $"Nouvelle version de LibreBooth disponible : {update.Version.ToString(3)} (vous avez la {App.Version}).";
+        if (update != null)
+        {
+            UpdateBannerText.Text = update.IsPrerelease
+                ? $"Pré-version de LibreBooth disponible : {update.Version.ToString(3)}, une version d'essai (vous avez la {App.Version})."
+                : $"Nouvelle version de LibreBooth disponible : {update.Version.ToString(3)} (vous avez la {App.Version}).";
+        }
         CheckUpdatesButton.IsEnabled = !_services.IsCheckingForUpdates && !downloading;
+        PrereleasesSwitch.IsEnabled = !downloading;
+        ReturnToStableButton.IsEnabled = !downloading;
         // Pendant le téléchargement, le texte suit la progression.
         if (downloading) return;
 
@@ -995,21 +1039,34 @@ public partial class AdminWindow : Window
         UpdateNotesText.Visibility = Visibility.Collapsed;
         InstallUpdateButton.Visibility = Visibility.Collapsed;
         UpdatePageButton.Visibility = Visibility.Collapsed;
+        PrereleaseWarning.Visibility = Visibility.Collapsed;
+        ReturnToStablePanel.Visibility = Visibility.Collapsed;
         if (_services.IsCheckingForUpdates)
         {
             UpdateStatusText.Text = "Recherche d'une nouvelle version…";
             return;
         }
+        if (_services.StableToReturnTo is { } stable) ShowReturnToStable(stable);
         if (update != null)
         {
             var version = update.Version.ToString(3);
-            UpdateStatusText.Text = $"Nouvelle version disponible : LibreBooth {version} (vous avez la {App.Version}).";
+            UpdateStatusText.Text = update.IsPrerelease
+                ? $"Pré-version disponible : LibreBooth {version} (vous avez la {App.Version})."
+                : $"Nouvelle version disponible : LibreBooth {version} (vous avez la {App.Version}).";
+            if (update.IsPrerelease)
+            {
+                PrereleaseWarningText.Text = "C'est une version d'essai, pas encore validée sur un booth : elle peut contenir des erreurs. "
+                                             + "Installez-la pour vos essais, jamais juste avant un événement. Une fois installée, "
+                                             + "cette page propose de revenir à la version stable.";
+                PrereleaseWarning.Visibility = Visibility.Visible;
+            }
             UpdateNotesText.Text = update.Notes;
             UpdateNotesText.Visibility = update.Notes.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
             UpdatePageButton.Visibility = Visibility.Visible;
             if (AppServices.IsInstalledCopy)
             {
-                InstallUpdateButton.Content = $"Installer la mise à jour {version} ({SizeText(update.Installer.Size)})";
+                InstallUpdateButton.Content = $"{(update.IsPrerelease ? "Installer la pré-version" : "Installer la mise à jour")} {version} "
+                                              + $"({SizeText(update.Installer.Size)})";
                 InstallUpdateButton.IsEnabled = true;
                 InstallUpdateButton.Visibility = Visibility.Visible;
             }
@@ -1027,32 +1084,96 @@ public partial class AdminWindow : Window
                 : "Pas encore de recherche depuis le lancement de LibreBooth.";
     }
 
+    /// <summary>Pré-version installée : rappel, et bouton pour revenir à la dernière version stable.</summary>
+    private void ShowReturnToStable(UpdateInfo stable)
+    {
+        var version = stable.Version.ToString(3);
+        ReturnToStableText.Text = $"Vous utilisez une pré-version : LibreBooth {App.Version} est plus récente que la dernière version stable, "
+                                  + $"la {version}. Pour un événement, revenez à la version stable.";
+        if (AppServices.IsInstalledCopy)
+        {
+            ReturnToStableButton.Content = $"Revenir à la version stable {version} ({SizeText(stable.Installer.Size)})";
+            ReturnToStableButton.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ReturnToStableText.Text += " Cette copie de LibreBooth n'a pas été installée avec le programme d'installation : "
+                                       + "téléchargez la version stable sur GitHub.";
+            ReturnToStableButton.Visibility = Visibility.Collapsed;
+        }
+        ReturnToStablePanel.Visibility = Visibility.Visible;
+    }
+
     private static string SizeText(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / (1024.0 * 1024):0} Mo" : $"{Math.Max(1, bytes / 1024)} Ko";
 
     private void ShowUpdate_Click(object sender, RoutedEventArgs e) => ShowPage(AdminPage.System, UpdatesGroup);
 
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e) => await _services.CheckForUpdatesAsync();
 
+    /// <summary>Pré-versions proposées ou non : réglage gardé tout de suite, puis nouvelle recherche avec ce réglage.</summary>
+    private async void Prereleases_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        var include = PrereleasesSwitch.IsChecked == true;
+        if (_services.Settings.IncludePrereleases == include) return;
+        _services.Settings.IncludePrereleases = include;
+        _services.SaveSettings();
+        _log.Information("Mises à jour : pré-versions {State}", include ? "proposées" : "plus proposées");
+        ShowUpdateStatus();
+        await _services.CheckForUpdatesAsync();
+    }
+
     private void UpdatePage_Click(object sender, RoutedEventArgs e) => Shell.OpenUrl(_services.AvailableUpdate?.PageUrl ?? UpdateChecker.ReleasesPage);
 
-    /// <summary>
-    /// Télécharge la nouvelle version, contrôle son empreinte, lance son programme d'installation (Windows demande
-    /// l'autorisation), puis ferme LibreBooth pour qu'il puisse remplacer les fichiers.
-    /// </summary>
+    /// <summary>Nouvelle version ou pré-version : confirmation (avec une mise en garde pour une pré-version), puis installation.</summary>
     private async void InstallUpdate_Click(object sender, RoutedEventArgs e)
     {
         if (_services.AvailableUpdate is not { } update || _updateDownload != null) return;
         var version = update.Version.ToString(3);
-        if (!AdminDialog.Ask(this,
+        var size = SizeText(update.Installer.Size);
+        var confirmed = update.IsPrerelease
+            ? AdminDialog.Ask(this,
+                $"Installer la pré-version LibreBooth {version} ?\n\n"
+                + "C'est une version d'essai, pas encore validée sur un booth : elle peut contenir des erreurs. "
+                + "Ne l'installez pas juste avant un événement.\n\n"
+                + $"LibreBooth va télécharger la pré-version ({size}) et contrôler son empreinte, puis se fermer pour l'installer. "
+                + "Windows va demander l'autorisation d'installer.\n\n"
+                + "Vos photos, événements, réglages et pilotes sont gardés. Pour revenir ensuite à la version stable : "
+                + "page Système, partie Mises à jour.",
+                "Installer la pré-version", "Annuler", MessageBoxImage.Warning, defaultConfirm: false)
+            : AdminDialog.Ask(this,
                 $"Installer LibreBooth {version} ?\n\n"
-                + $"LibreBooth va télécharger la mise à jour ({SizeText(update.Installer.Size)}) et contrôler son empreinte, puis se fermer pour l'installer. "
+                + $"LibreBooth va télécharger la mise à jour ({size}) et contrôler son empreinte, puis se fermer pour l'installer. "
                 + "Windows va demander l'autorisation d'installer.\n\n"
                 + "Vos photos, événements, réglages et pilotes sont gardés. À la fin, LibreBooth peut se rouvrir tout seul.",
-                "Installer", "Plus tard"))
+                "Installer", "Plus tard");
+        if (confirmed) await DownloadAndInstallAsync(update);
+    }
+
+    /// <summary>Pré-version installée : la dernière version stable s'installe à sa place, comme une mise à jour.</summary>
+    private async void ReturnToStable_Click(object sender, RoutedEventArgs e)
+    {
+        if (_services.StableToReturnTo is not { } stable || _updateDownload != null) return;
+        var version = stable.Version.ToString(3);
+        if (!AdminDialog.Ask(this,
+                $"Revenir à LibreBooth {version}, la dernière version stable ?\n\n"
+                + $"LibreBooth va télécharger la version {version} ({SizeText(stable.Installer.Size)}) et contrôler son empreinte, puis se "
+                + $"fermer pour l'installer à la place de la pré-version {App.Version}. Windows va demander l'autorisation d'installer.\n\n"
+                + "Vos photos, événements, réglages et pilotes sont gardés. À la fin, LibreBooth peut se rouvrir tout seul.",
+                "Revenir à la version stable", "Annuler"))
         {
             return;
         }
+        await DownloadAndInstallAsync(stable);
+    }
 
+    /// <summary>
+    /// Télécharge le programme d'installation de <paramref name="target"/>, contrôle son empreinte, le lance (Windows
+    /// demande l'autorisation), puis ferme LibreBooth pour qu'il puisse remplacer les fichiers.
+    /// </summary>
+    private async Task DownloadAndInstallAsync(UpdateInfo target)
+    {
+        var version = target.Version.ToString(3);
         CustomizationView.Flush();
         _services.Settings.Normalize();
         _services.SaveSettings();
@@ -1070,7 +1191,7 @@ public partial class AdminWindow : Window
                 UpdateProgress.Value = p;
                 UpdateStatusText.Text = $"Téléchargement de LibreBooth {version}… {p * 100:0} %";
             });
-            installer = await _services.DownloadUpdateAsync(update, progress, _updateDownload.Token);
+            installer = await _services.DownloadUpdateAsync(target, progress, _updateDownload.Token);
         }
         catch (Exception ex)
         {

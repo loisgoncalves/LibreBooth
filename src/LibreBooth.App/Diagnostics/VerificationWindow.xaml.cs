@@ -57,7 +57,11 @@ public partial class VerificationWindow : Window
         _run?.Cancel();
         var run = _run = new CancellationTokenSource();
         _results.Clear();
-        CanonSdkBanner.Visibility = NativeDrivers.CanonFiles.All(f => NativeDrivers.Find(f) != null) ? Visibility.Collapsed : Visibility.Visible;
+        // Le SDK Canon ne manque que s'il est choisi (admin › Appareil photo) : par défaut, c'est le pilote de Windows.
+        var sdkChosen = InstallationCheck.CameraSettingsFor(_services, _paths).Driver == CameraDriver.CanonSdk;
+        CanonSdkBanner.Visibility = sdkChosen && NativeDrivers.CanonFiles.Any(f => NativeDrivers.Find(f) == null)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         BusyBar.Visibility = Visibility.Visible;
         RerunButton.IsEnabled = false;
         SummaryText.Text = "Vérification en cours…";

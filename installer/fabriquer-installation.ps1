@@ -55,13 +55,14 @@ if ($Public) {
     @"
 LibreBooth $version – pilotes à ajouter
 
-Les fichiers de Canon et de DNP ne sont pas fournis avec LibreBooth : ils appartiennent à leurs fabricants.
-Le programme d'installation (LibreBooth-$version-Installation.exe) s'occupe des deux premiers points.
+Les fichiers de DNP (et le SDK Canon, facultatif) ne sont pas fournis avec LibreBooth : ils appartiennent à leurs
+fabricants. Le programme d'installation (LibreBooth-$version-Installation.exe) s'occupe du pilote de la DS620.
 
-1. Appareil photo Canon (obligatoire) : téléchargez le SDK Canon EDSDK pour Windows (gratuit, sur inscription
-   chez Canon : https://www.canon-europe.com/business/imaging-solutions/sdk/). Puis, dans LibreBooth :
-   admin > Appareil photo > « Ajouter le SDK Canon… », et choisissez le zip téléchargé : LibreBooth en extrait
-   lui-même EDSDK.dll et EdsImage.dll (version 32 bits) et les range dans C:\Users\<nom>\LibreBooth\Pilotes.
+1. Appareil photo Canon : rien à ajouter. LibreBooth le pilote par le pilote intégré à Windows.
+   Seulement si Windows ne sait pas piloter votre modèle : téléchargez le SDK Canon EDSDK pour Windows (gratuit,
+   sur inscription chez Canon : https://www.canon-europe.com/business/imaging-solutions/sdk/). Puis, dans
+   LibreBooth : admin > Appareil photo > « SDK Canon (secours) » > « Ajouter le SDK Canon… », et choisissez le zip
+   téléchargé : LibreBooth en extrait lui-même EDSDK.dll et EdsImage.dll (version 32 bits).
 2. Imprimante DNP DS620 : installez son pilote Windows depuis la page Téléchargements de DNP
    (https://dnpphoto.eu/downloads/).
 3. Facultatif : cspstat.dll (API d'état des imprimantes DNP), à copier dans le dossier Pilotes, pour lire le

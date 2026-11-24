@@ -49,7 +49,7 @@ public partial class App : Application
         if (options.IsDiagnosticRun)
         {
             var report = options.DiagnosticReport ?? Path.Combine(paths.DataRoot, $"diagnostic-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
-            _ = RunDiagnosticAsync(report);
+            _ = RunDiagnosticAsync(report, paths);
             return;
         }
 
@@ -181,11 +181,13 @@ public partial class App : Application
         }
     }
 
-    private async Task RunDiagnosticAsync(string report)
+    private async Task RunDiagnosticAsync(string report, AppPaths paths)
     {
         try
         {
-            await HardwareDiagnostic.RunAsync(report, StartupOptions.Current.PrintTestPages, StartupOptions.Current.PrintToFiles,
+            // Le diagnostic essaie le pilote de l'appareil choisi dans l'admin (celui de Windows par défaut).
+            var camera = InstallationCheck.CameraSettingsFor(null, paths);
+            await HardwareDiagnostic.RunAsync(report, camera, StartupOptions.Current.PrintTestPages, StartupOptions.Current.PrintToFiles,
                 StartupOptions.Current.BookmarkPages);
             if (StartupOptions.Current.DiagnosticReport == null)
             {

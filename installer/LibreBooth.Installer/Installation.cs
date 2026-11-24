@@ -112,10 +112,10 @@ internal static class Installation
     }
 
     /// <summary>
-    /// Fichiers des fabricants (SDK Canon, statut DNP) : ils ne sont pas dans la version publique. Une mise à jour ne
-    /// les retire donc jamais (sinon l'appareil ne marcherait plus) ; seule la désinstallation les supprime.
+    /// Fichiers des fabricants (SDK Canon, facultatif depuis la 3.1.0 ; statut DNP) : ils ne sont pas dans la version
+    /// publique. Une mise à jour ne les retire donc jamais ; seule la désinstallation les supprime.
     /// </summary>
-    public static readonly string[] VendorFiles = CanonSdk.Files.Concat(new[] { "cspstat.dll" }).ToArray();
+    public static readonly string[] VendorFiles = { "EDSDK.dll", "EdsImage.dll", "cspstat.dll" };
 
     /// <summary>Version de LibreBooth installée dans ce dossier (null s'il n'y en a pas).</summary>
     public static string? InstalledVersion(string dir)

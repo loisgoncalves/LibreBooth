@@ -88,9 +88,10 @@ internal static class Program
 
         if (!silent)
         {
-            // Une version plus récente est déjà là : on prévient avant de revenir en arrière.
+            // Une version plus récente est déjà là : on prévient avant de revenir en arrière. Pas depuis l'admin
+            // (/mise-a-jour) : le retour à la version stable y est déjà confirmé.
             var installed = Installation.InstalledVersion(dir);
-            if (Installation.IsOlder(Installation.Version, installed))
+            if (!update && Installation.IsOlder(Installation.Version, installed))
             {
                 var answer = MessageBox.Show(
                     $"Une version plus récente de LibreBooth ({installed}) est déjà installée sur ce PC.\n\n"

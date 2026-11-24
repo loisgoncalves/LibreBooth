@@ -19,7 +19,8 @@ internal static class HardwareDiagnostic
 {
     /// <param name="toFiles">Les pages de test sont écrites par le pilote dans des fichiers .prn au lieu de sortir sur papier.</param>
     /// <param name="bookmarkPages">Si plus de 0 : seul le marque-page est imprimé, en autant de pages dans une même tâche.</param>
-    public static async Task RunAsync(string reportPath, bool printTestPages = false, bool toFiles = false, int bookmarkPages = 0)
+    /// <param name="camera">Réglages de l'appareil (config.json) : le diagnostic essaie le pilote choisi dans l'admin.</param>
+    public static async Task RunAsync(string reportPath, CameraSettings camera, bool printTestPages = false, bool toFiles = false, int bookmarkPages = 0)
     {
         var lines = new List<string>();
 
@@ -34,15 +35,22 @@ internal static class HardwareDiagnostic
             Add($"Diagnostic LibreBooth {App.Version} – {DateTime.Now:dd.MM.yyyy HH:mm:ss}");
             Add($"Windows {Environment.OSVersion.Version} ({(Environment.Is64BitOperatingSystem ? "64" : "32")} bits) · LibreBooth en {(Environment.Is64BitProcess ? "64" : "32")} bits · .NET {Environment.Version}");
             Add($"Dossier du programme : {AppContext.BaseDirectory}");
+            var sdkChosen = camera.Driver == CameraDriver.CanonSdk;
+            Add(sdkChosen
+                ? "Pilote de l'appareil photo : SDK Canon (choisi en secours dans l'admin)"
+                : "Pilote de l'appareil photo : pilote intégré à Windows (sans SDK Canon)");
             foreach (var dll in new[] { "EDSDK.dll", "EdsImage.dll", "cspstat.dll" })
             {
                 var path = NativeDrivers.Find(dll);
-                Add(path != null ? $"{dll} : présent (version {FileVersionInfo.GetVersionInfo(path).FileVersion}, {Path.GetDirectoryName(path)})" : $"{dll} : ABSENT (à copier dans {NativeDrivers.UserFolder})");
+                var needed = sdkChosen || !NativeDrivers.CanonFiles.Contains(dll);
+                Add(path != null ? $"{dll} : présent (version {FileVersionInfo.GetVersionInfo(path).FileVersion}, {Path.GetDirectoryName(path)})"
+                    : needed ? $"{dll} : ABSENT (à copier dans {NativeDrivers.UserFolder})"
+                    : $"{dll} : absent (facultatif : SDK Canon non utilisé)");
             }
 
             Add("");
             Add("== Appareil photo Canon ==");
-            await CheckCameraAsync(Add, reportPath);
+            await CheckCameraAsync(Add, reportPath, camera);
 
             Add("");
             Add("== Imprimantes installées dans Windows ==");
@@ -156,9 +164,23 @@ internal static class HardwareDiagnostic
         add($"Compteur DNP : {before?.ToString() ?? "?"} avant, {after.RemainingPrints?.ToString() ?? "?"} après ({after.Message})");
     }
 
-    private static async Task CheckCameraAsync(Action<string> add, string reportPath)
+    private static async Task CheckCameraAsync(Action<string> add, string reportPath, CameraSettings settings)
     {
-        using var camera = new CanonCamera(() => new CameraSettings());
+        if (settings.Driver == CameraDriver.Windows)
+        {
+            try
+            {
+                var devices = Wpd.ListDevices();
+                if (devices.Count == 0) add("Appareils vus par Windows : aucun");
+                foreach (var device in devices) add($"Vu par Windows : {device.FriendlyName} ({device.Manufacturer})");
+            }
+            catch (Exception ex)
+            {
+                add("Liste des appareils de Windows illisible : " + ex.Message);
+            }
+        }
+
+        using var camera = CameraFactory.CreateCanon(() => settings);
         camera.Start();
 
         // On laisse au pilote le temps de trouver l'appareil (la recherche est relancée toutes les 2 s).

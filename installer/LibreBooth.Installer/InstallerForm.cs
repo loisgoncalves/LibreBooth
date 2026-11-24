@@ -22,21 +22,8 @@ internal sealed class InstallerForm : Form
     private readonly Button _verifyExistingButton = new() { Text = "Vérifier l'installation actuelle (sans réinstaller)", AutoSize = true, Visible = false };
     private readonly CheckBox _verifyCheck = new() { Text = "Vérifier que tout fonctionne : dossiers, pilotes, imprimante, appareil photo (recommandé)", AutoSize = true, Checked = true, Visible = false };
     private readonly CheckBox _launchCheck = new() { Text = "Lancer LibreBooth maintenant", AutoSize = true, Checked = false, Visible = false };
-    // Étape « SDK Canon » (version publique) : il ne peut pas être fourni, il se télécharge chez Canon.
-    private readonly FlowLayoutPanel _canonPanel = new() { AutoSize = true, FlowDirection = FlowDirection.TopDown, WrapContents = false, Visible = false, Margin = new Padding(0, 10, 0, 6) };
-    private readonly Button _canonPageButton = new() { Text = "1. Ouvrir la page Canon", AutoSize = true };
-    private readonly Button _canonImportButton = new() { Text = "2. Choisir le SDK téléchargé…", AutoSize = true };
-    private readonly Label _canonIntro = new()
-    {
-        Text = "Appareil photo Canon : il manque le SDK Canon EDSDK. Ouvrez la page Canon, inscrivez-vous (gratuit) et "
-               + "téléchargez le SDK EDSDK pour Windows. Indiquez ensuite le fichier téléchargé : LibreBooth en extrait "
-               + "lui-même les fichiers nécessaires (version 32 bits).",
-        Font = new Font("Segoe UI", 10f, FontStyle.Bold),
-        AutoSize = true,
-        MaximumSize = new Size(560, 0),
-        Margin = new Padding(0, 0, 0, 6),
-    };
-    private readonly Label _canonStatus = new() { AutoSize = true, MaximumSize = new Size(560, 0) };
+    // Depuis la 3.1.0, plus d'étape « SDK Canon » : LibreBooth pilote le Canon par le pilote intégré à Windows. Le SDK
+    // reste possible en secours, et s'ajoute alors depuis LibreBooth (admin › Appareil photo).
     private readonly ProgressBar _progress = new() { Width = 540, Height = 18 };
     private readonly Label _status = new() { AutoSize = true, MaximumSize = new Size(560, 0) };
     private readonly Button _installButton = new() { Text = "Installer", AutoSize = true, MinimumSize = new Size(110, 32) };
@@ -83,13 +70,6 @@ internal sealed class InstallerForm : Form
         }
         layout.Controls.Add(_progress);
         layout.Controls.Add(_status);
-        layout.Controls.Add(_canonPanel);
-        _canonPanel.Controls.Add(_canonIntro);
-        var canonButtons = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
-        canonButtons.Controls.Add(_canonPageButton);
-        canonButtons.Controls.Add(_canonImportButton);
-        _canonPanel.Controls.Add(canonButtons);
-        _canonPanel.Controls.Add(_canonStatus);
         layout.Controls.Add(_verifyCheck);
         layout.Controls.Add(_launchCheck);
         var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Right, Margin = new Padding(0, 14, 0, 0) };
@@ -104,8 +84,6 @@ internal sealed class InstallerForm : Form
         _installButton.Click += async (_, _) => await InstallOrFinishAsync();
         _cancelButton.Click += (_, _) => Close();
         _verifyExistingButton.Click += (_, _) => VerifyExisting();
-        _canonPageButton.Click += (_, _) => OpenInBrowser(CanonSdk.Page);
-        _canonImportButton.Click += (_, _) => ImportCanonSdk();
         // Vérifier ou lancer LibreBooth : l'un ou l'autre (la vérification propose ensuite de lancer LibreBooth).
         _verifyCheck.CheckedChanged += (_, _) => { if (_verifyCheck.Checked) _launchCheck.Checked = false; };
         _launchCheck.CheckedChanged += (_, _) => { if (_launchCheck.Checked) _verifyCheck.Checked = false; };
@@ -119,7 +97,7 @@ internal sealed class InstallerForm : Form
         {
             Text = withDriver
                 ? "LibreBooth, le logiciel du photobooth, et le pilote de l'imprimante DNP DS620 vont être installés sur ce PC. "
-                  + "L'appareil photo Canon n'a besoin d'aucun pilote Windows."
+                  + "L'appareil photo Canon n'a rien à installer : LibreBooth utilise le pilote intégré à Windows."
                 : "LibreBooth, le logiciel du photobooth, va être installé sur ce PC.",
             AutoSize = true,
             MaximumSize = new Size(560, 0),
@@ -129,9 +107,9 @@ internal sealed class InstallerForm : Form
         {
             layout.Controls.Add(new Label
             {
-                Text = "Les fichiers de Canon et de DNP appartiennent à leurs fabricants : ils ne sont pas dans ce programme. "
-                       + "Le pilote de la DS620 se télécharge sur le site de DNP pendant l'installation. Le SDK Canon (gratuit, "
-                       + "sur inscription chez Canon) s'ajoute en deux clics à la fin.",
+                Text = "Le pilote de la DS620 appartient à DNP : il n'est pas dans ce programme, il se télécharge sur le site "
+                       + "de DNP pendant l'installation. L'appareil photo Canon n'a rien à installer : LibreBooth utilise le "
+                       + "pilote intégré à Windows.",
                 ForeColor = Color.FromArgb(0x8A, 0x4B, 0x00),
                 AutoSize = true,
                 MaximumSize = new Size(560, 0),
@@ -178,14 +156,6 @@ internal sealed class InstallerForm : Form
     {
         if (_done)
         {
-            if (_canonPanel.Visible && !CanonSdk.IsAvailable(_options.InstallDir, _options.TestMode))
-            {
-                var answer = MessageBox.Show(this,
-                    "Le SDK Canon n'est pas encore ajouté : sans lui, LibreBooth ne peut pas piloter l'appareil photo.\n\n"
-                    + "Vous pourrez l'ajouter plus tard depuis LibreBooth (admin › Appareil photo › « Ajouter le SDK Canon »).\n\nTerminer quand même ?",
-                    "LibreBooth", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (answer != DialogResult.Yes) return;
-            }
             if (_verifyCheck.Visible && _verifyCheck.Checked) Installation.LaunchVerification(_options.TestMode, _options.InstallDir);
             else if (_launchCheck.Visible && _launchCheck.Checked) LaunchLibreBooth();
             Close();
@@ -248,7 +218,6 @@ internal sealed class InstallerForm : Form
                 _status.Text += "\n\n⚠ " + string.Join("\n⚠ ", warnings);
                 _status.ForeColor = Color.FromArgb(0x8A, 0x4B, 0x00);
             }
-            _canonPanel.Visible = !CanonSdk.IsAvailable(_options.InstallDir, _options.TestMode);
             _verifyCheck.Visible = !_options.Update && Installation.VerifyShortcutPath(_options.TestMode, _options.InstallDir) != null;
             _launchCheck.Visible = !_options.TestMode;
             // Après une mise à jour, LibreBooth se rouvre (sauf si l'on décoche la case).
@@ -285,44 +254,6 @@ internal sealed class InstallerForm : Form
         _desktopCheck.Enabled = enabled;
         _installButton.Enabled = enabled;
         _cancelButton.Enabled = enabled;
-    }
-
-    /// <summary>Le SDK téléchargé chez Canon (zip) : EDSDK.dll et EdsImage.dll 32 bits sont posés à côté de LibreBooth.exe.</summary>
-    private void ImportCanonSdk()
-    {
-        using var dialog = new OpenFileDialog
-        {
-            Title = "SDK Canon EDSDK téléchargé (fichier zip)",
-            Filter = "SDK Canon (*.zip ; EDSDK.dll)|*.zip;EDSDK.dll|Tous les fichiers|*.*",
-            InitialDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"),
-        };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-        try
-        {
-            var version = CanonSdk.Import(dialog.FileName, _options.InstallDir);
-            _canonIntro.Text = "Appareil photo Canon";
-            _canonStatus.Text = $"✓ SDK Canon ajouté (EDSDK {version}) : LibreBooth peut piloter l'appareil photo.";
-            _canonStatus.ForeColor = Color.FromArgb(0x1E, 0x7B, 0x34);
-        }
-        catch (Exception ex)
-        {
-            Installation.Log("SDK Canon non ajouté : " + ex);
-            _canonStatus.Text = "Ce fichier ne convient pas : " + ex.Message;
-            _canonStatus.ForeColor = Color.FromArgb(0xA4, 0x26, 0x2C);
-        }
-    }
-
-    /// <summary>Page web ouverte par l'Explorateur, donc dans le navigateur habituel et sans droits d'administrateur.</summary>
-    private static void OpenInBrowser(string url)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{url}\"") { UseShellExecute = true });
-        }
-        catch (Exception ex)
-        {
-            Installation.Log("Page impossible à ouvrir : " + ex.Message);
-        }
     }
 
     /// <summary>LibreBooth est lancé par l'Explorateur, donc sans les droits d'administrateur de l'installation.</summary>

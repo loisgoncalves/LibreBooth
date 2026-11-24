@@ -55,7 +55,8 @@ public static class InstallationCheck
     public static async Task RunAsync(AppServices? services, AppPaths? paths, Action<CheckResult> report, CancellationToken token = default)
     {
         await Task.Yield();
-        CheckProgram(report);
+        var camera = CameraSettingsFor(services, paths);
+        CheckProgram(report, camera);
         token.ThrowIfCancellationRequested();
 
         var settings = CheckData(services, paths, report);
@@ -64,15 +65,33 @@ public static class InstallationCheck
         await CheckPrinterAsync(services, settings, report, token);
         token.ThrowIfCancellationRequested();
 
-        await CheckCameraAsync(services, report, token);
+        await CheckCameraAsync(services, camera, report, token);
         token.ThrowIfCancellationRequested();
 
         CheckFonts(report);
     }
 
+    /// <summary>
+    /// Réglages de l'appareil (pour savoir quel pilote vérifier), lus sans rien signaler : un config.json illisible est
+    /// signalé plus loin, dans « Dossier des données ».
+    /// </summary>
+    internal static CameraSettings CameraSettingsFor(AppServices? services, AppPaths? paths)
+    {
+        if (services != null) return services.Settings.Camera;
+        try
+        {
+            var file = (paths ?? AppPaths.Create()).ConfigFile;
+            return (File.Exists(file) ? JsonDefaults.Read<AppSettings>(file) : null)?.Normalize().Camera ?? new CameraSettings();
+        }
+        catch (Exception)
+        {
+            return new CameraSettings();
+        }
+    }
+
     // ---------------------------------------------------------------- Programme
 
-    private static void CheckProgram(Action<CheckResult> report)
+    private static void CheckProgram(Action<CheckResult> report, CameraSettings camera)
     {
         var folder = AppContext.BaseDirectory;
         report(new CheckResult(ProgramCategory, $"LibreBooth {App.Version}", CheckStatus.Ok, $"Dossier du programme : {folder}"));
@@ -83,10 +102,23 @@ public static class InstallationCheck
             : new CheckResult(ProgramCategory, "Fichiers du programme", CheckStatus.Error, "Fichiers manquants : " + string.Join(", ", missing),
                 "Relancez le programme d'installation de LibreBooth pour remettre les fichiers manquants."));
 
-        report(DriverFile("Pilote de l'appareil Canon (SDK EDSDK)", NativeDrivers.CanonFiles, CheckStatus.Error,
-            $"Téléchargez le SDK Canon EDSDK pour Windows (gratuit, sur inscription chez Canon : {CanonSdkImport.Page}), puis "
-            + "ajoutez-le avec le bouton « Ajouter le SDK Canon… » (ici, ou dans l'admin › Appareil photo) : LibreBooth "
-            + "en extrait lui-même les bons fichiers."));
+        if (camera.Driver == CameraDriver.CanonSdk)
+        {
+            report(DriverFile("Pilote de l'appareil Canon (SDK Canon, choisi en secours)", NativeDrivers.CanonFiles, CheckStatus.Error,
+                $"Téléchargez le SDK Canon EDSDK pour Windows (gratuit, sur inscription chez Canon : {CanonSdkImport.Page}), puis "
+                + "ajoutez-le avec le bouton « Ajouter le SDK Canon… » (ici, ou dans l'admin › Appareil photo) : LibreBooth "
+                + "en extrait lui-même les bons fichiers. Ou revenez au pilote de Windows dans l'admin › Appareil photo."));
+        }
+        else
+        {
+            report(new CheckResult(ProgramCategory, "Pilote de l'appareil Canon", CheckStatus.Ok,
+                "Pilote intégré à Windows : rien à installer (le SDK Canon n'est pas nécessaire)."));
+            if (NativeDrivers.CanonFiles.Any(f => NativeDrivers.Find(f) != null))
+            {
+                report(DriverFile("SDK Canon (secours, non utilisé)", NativeDrivers.CanonFiles, CheckStatus.Info,
+                    "Facultatif : il ne sert que si vous le choisissez dans l'admin › Appareil photo."));
+            }
+        }
         report(DriverFile("Lecture de l'état de la DNP", new[] { NativeDrivers.DnpStatusFile }, CheckStatus.Info,
             $"Facultatif : si vous avez cspstat.dll (API d'état des imprimantes DNP), copiez-la dans {NativeDrivers.UserFolder}. "
             + "Sans elle, LibreBooth compte lui-même ses tirages."));
@@ -333,7 +365,7 @@ public static class InstallationCheck
 
     // ---------------------------------------------------------------- Appareil photo
 
-    private static async Task CheckCameraAsync(AppServices? services, Action<CheckResult> report, CancellationToken token)
+    private static async Task CheckCameraAsync(AppServices? services, CameraSettings settings, Action<CheckResult> report, CancellationToken token)
     {
         if (services != null)
         {
@@ -351,11 +383,12 @@ public static class InstallationCheck
             return;
         }
 
-        using var canon = new CanonCamera(() => new CameraSettings());
+        // Le Canon avec le pilote choisi dans l'admin (celui de Windows par défaut).
+        using var canon = CameraFactory.CreateCanon(() => settings);
         try
         {
             canon.Start();
-            // Le pilote Canon cherche l'appareil toutes les 2 secondes : on lui laisse 12 secondes.
+            // Le pilote cherche l'appareil toutes les 2 secondes : on lui laisse 12 secondes.
             var deadline = DateTime.Now.AddSeconds(12);
             while (DateTime.Now < deadline && canon.State != CameraState.Ready && canon.State != CameraState.Error)
             {
@@ -368,7 +401,7 @@ public static class InstallationCheck
         }
         catch (Exception ex)
         {
-            report(new CheckResult(CameraCategory, "Pilote Canon", CheckStatus.Error, ex.Message,
+            report(new CheckResult(CameraCategory, "Pilote de l'appareil photo", CheckStatus.Error, ex.Message,
                 "Relancez le programme d'installation, puis vérifiez que l'appareil est branché."));
             return;
         }
@@ -385,7 +418,7 @@ public static class InstallationCheck
         }
         else
         {
-            var sdkMissing = NativeDrivers.CanonFiles.Any(f => NativeDrivers.Find(f) == null);
+            var sdkMissing = settings.Driver == CameraDriver.CanonSdk && NativeDrivers.CanonFiles.Any(f => NativeDrivers.Find(f) == null);
             report(new CheckResult(CameraCategory, "Appareil Canon", CheckStatus.Warning, canon.StatusMessage,
                 sdkMissing
                     ? "Ajoutez d'abord le SDK Canon (voir « Pilote de l'appareil Canon » plus haut)."

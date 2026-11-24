@@ -41,6 +41,8 @@ public sealed record ReadinessInput
     /// <summary>LibreBooth lancé en mode démonstration (--demo) : appareil et imprimante d'essai.</summary>
     public bool DemoMode { get; init; }
     public CameraKind CameraKind { get; init; } = CameraKind.Canon;
+    /// <summary>Pilote du Canon (depuis la 3.1.0) : le SDK Canon ne manque que s'il est choisi.</summary>
+    public CameraDriver CameraDriver { get; init; } = CameraDriver.Windows;
     /// <summary>EDSDK.dll ou EdsImage.dll introuvable (appareil Canon choisi).</summary>
     public bool CanonSdkMissing { get; init; }
     public CameraState CameraState { get; init; } = CameraState.Disconnected;
@@ -74,6 +76,16 @@ public sealed record ReadinessInput
 
     /// <summary>Version publiée plus récente que celle-ci, si la recherche l'a trouvée.</summary>
     public string? AvailableUpdate { get; init; }
+    /// <summary>La version proposée est une pré-version (version d'essai).</summary>
+    public bool AvailableUpdateIsPrerelease { get; init; }
+
+    /// <summary>Version de LibreBooth en marche.</summary>
+    public string? CurrentVersion { get; init; }
+    /// <summary>
+    /// Dernière version stable, quand la version en marche est plus récente qu'elle (une pré-version est installée) ;
+    /// null sinon.
+    /// </summary>
+    public string? StableToReturnTo { get; init; }
 }
 
 /// <summary>
@@ -96,10 +108,18 @@ public static class Readiness
         items.Add(Formats(input));
         if (PrintLimit(input) is { } limit) items.Add(limit);
         if (Disk(input) is { } disk) items.Add(disk);
+        if (!string.IsNullOrWhiteSpace(input.StableToReturnTo))
+        {
+            var current = string.IsNullOrWhiteSpace(input.CurrentVersion) ? "Cette version" : $"LibreBooth {input.CurrentVersion.Trim()}";
+            items.Add(new ReadinessItem(ReadinessArea.Update, ReadinessLevel.Warning, "Pré-version installée",
+                $"{current} est une version d'essai : pour un événement, revenez à la version stable {input.StableToReturnTo}."));
+        }
         if (!string.IsNullOrWhiteSpace(input.AvailableUpdate))
         {
             items.Add(new ReadinessItem(ReadinessArea.Update, ReadinessLevel.Info, "Mise à jour",
-                $"La version {input.AvailableUpdate} est disponible."));
+                input.AvailableUpdateIsPrerelease
+                    ? $"La pré-version {input.AvailableUpdate} (version d'essai) est disponible."
+                    : $"La version {input.AvailableUpdate} est disponible."));
         }
         return items;
     }
@@ -138,10 +158,10 @@ public static class Readiness
             return new(ReadinessArea.Camera, ReadinessLevel.Warning, title,
                 "Appareil de démonstration choisi : les invités auront des images d'exemple. Choisissez le Canon pour l'événement.");
         }
-        if (input.CanonSdkMissing)
+        if (input.CanonSdkMissing && input.CameraDriver == CameraDriver.CanonSdk)
         {
             return new(ReadinessArea.Camera, ReadinessLevel.Error, title,
-                "Le SDK Canon manque : ajoutez-le dans la page Appareil photo.");
+                "Le SDK Canon manque : ajoutez-le dans la page Appareil photo, ou choisissez le pilote de Windows.");
         }
 
         var name = string.IsNullOrWhiteSpace(input.CameraName) ? "Appareil" : input.CameraName.Trim();

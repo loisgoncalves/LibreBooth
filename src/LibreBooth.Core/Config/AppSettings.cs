@@ -2,10 +2,19 @@ namespace LibreBooth.Core.Config;
 
 public enum CameraKind
 {
-    /// <summary>Reflex/hybride Canon EOS piloté par le SDK Canon (EDSDK).</summary>
+    /// <summary>Reflex/hybride Canon EOS branché en USB (pilote choisi par <see cref="CameraSettings.Driver"/>).</summary>
     Canon,
     /// <summary>Fausse caméra pour tester sans appareil.</summary>
     Demo,
+}
+
+/// <summary>Comment LibreBooth pilote le Canon EOS (depuis la 3.1.0).</summary>
+public enum CameraDriver
+{
+    /// <summary>Pilote intégré à Windows : rien à installer (par défaut).</summary>
+    Windows,
+    /// <summary>SDK Canon EDSDK, à télécharger chez Canon : solution de secours si Windows ne sait pas piloter l'appareil.</summary>
+    CanonSdk,
 }
 
 /// <summary>Apparence des fenêtres de l'admin (le photobooth des invités garde les couleurs de l'événement).</summary>
@@ -24,6 +33,11 @@ public sealed class AppSettings
     public bool LaunchAtStartup { get; set; }
     /// <summary>Au lancement, demande à GitHub s'il existe une nouvelle version (proposée ensuite dans l'admin).</summary>
     public bool CheckForUpdates { get; set; } = true;
+    /// <summary>
+    /// Propose aussi les pré-versions (versions d'essai publiées sur GitHub), pour les essayer sur un booth. Depuis la
+    /// 3.1.0 ; une version plus ancienne ignore ce réglage.
+    /// </summary>
+    public bool IncludePrereleases { get; set; }
     /// <summary>Admin en clair ou en sombre (depuis la 3.0.0 ; une version plus ancienne ignore ce réglage).</summary>
     public AdminAppearance AdminAppearance { get; set; } = AdminAppearance.Light;
     public CameraSettings Camera { get; set; } = new();
@@ -41,6 +55,8 @@ public sealed class AppSettings
         if (string.IsNullOrWhiteSpace(AdminPin) || AdminPin.Length < 4 || !AdminPin.All(char.IsDigit)) AdminPin = "1234";
         if (!Enum.IsDefined(AdminAppearance)) AdminAppearance = AdminAppearance.Light;
 
+        if (!Enum.IsDefined(Camera.Kind)) Camera.Kind = CameraKind.Canon;
+        if (!Enum.IsDefined(Camera.Driver)) Camera.Driver = CameraDriver.Windows;
         Camera.Rotation = Camera.Rotation switch { 90 or 180 or 270 => Camera.Rotation, _ => 0 };
         Camera.CaptureTimeoutSeconds = Math.Clamp(Camera.CaptureTimeoutSeconds, 4, 60);
 
@@ -66,6 +82,11 @@ public sealed class AppSettings
 public sealed class CameraSettings
 {
     public CameraKind Kind { get; set; } = CameraKind.Canon;
+    /// <summary>
+    /// Pilote du Canon : Windows par défaut, SDK Canon en secours (depuis la 3.1.0 ; une version plus ancienne ignore
+    /// ce réglage et utilise toujours le SDK).
+    /// </summary>
+    public CameraDriver Driver { get; set; } = CameraDriver.Windows;
     /// <summary>Live view affiché comme un miroir (plus naturel pour les invités).</summary>
     public bool MirrorLiveView { get; set; } = true;
     /// <summary>Photos finales inversées comme un miroir (désactivé par défaut : le texte reste lisible).</summary>
@@ -74,8 +95,8 @@ public sealed class CameraSettings
     public int Rotation { get; set; }
     /// <summary>Faire l'autofocus avant chaque photo (déconseillé : mise au point manuelle plus fiable).</summary>
     public bool UseAutofocus { get; set; }
-    /// <summary>Enregistrer aussi chaque photo sur la carte SD de l'appareil, en secours.</summary>
-    public bool SaveToCardToo { get; set; }
+    // « Copie sur la carte SD » (SaveToCardToo) est retirée en 3.1.0 : les photos vont au PC seulement, et ce
+    // réglage, encore présent dans un ancien config.json, est ignoré à la lecture.
     public int CaptureTimeoutSeconds { get; set; } = 10;
 }
 

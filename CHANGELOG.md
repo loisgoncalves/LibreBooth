@@ -6,6 +6,28 @@ même. La version installée s'affiche dans l'admin › Système.
 Numéro majeure.fonction.correctif : **majeure** quand les habitudes ou les fichiers de l'utilisateur changent,
 **fonction** pour une nouveauté, **correctif** pour une correction (voir le README, « Numéros de version »).
 
+## 3.1.0 – 24/11/2026
+
+Plus besoin du SDK Canon : LibreBooth pilote l'appareil photo par le pilote intégré à Windows.
+
+- **Canon sans SDK** : live view, photos avec ou sans autofocus, reconnexion après un débranchement, tout passe par
+  le pilote de Windows (Windows 10 et 11). Plus rien à télécharger chez Canon, plus d'inscription. Essayé avec un
+  EOS 1300D.
+- **Tous les booths passent au pilote de Windows**, y compris après une mise à jour : un SDK Canon déjà ajouté reste
+  en place, mais ne sert plus que si on le choisit.
+- **SDK Canon en secours** : admin › Appareil photo › « Pilote du Canon ». Si Windows ne sait pas piloter un modèle,
+  « SDK Canon (secours) » remet l'ancien fonctionnement ; le SDK s'ajoute alors depuis cette même page.
+- **Option « Copie sur la carte SD » retirée** : les photos sont enregistrées sur le PC seulement, avec les deux
+  pilotes. Si elle était cochée, elle est simplement ignorée.
+- **Pré-versions** : admin › Système › Mises à jour › « Proposer aussi les pré-versions », coupé au départ. Allumé,
+  l'admin propose aussi les versions d'essai publiées sur GitHub, avec une mise en garde avant de les installer.
+- **Retour à la version stable** : tant qu'une pré-version est installée, l'accueil le rappelle (« Pré-version
+  installée »), et Système › Mises à jour propose « Revenir à la version stable » (téléchargement contrôlé comme une
+  mise à jour).
+- **Programme d'installation** : plus d'étape « SDK Canon ». Lancé par l'admin pour revenir à la version stable, il ne
+  redemande plus de confirmer le retour à une version plus ancienne.
+- **Vérification de l'installation** et accueil de l'admin : le SDK Canon n'est demandé que s'il est choisi.
+
 ## 3.0.0 – 24/11/2026
 
 Version majeure : l'admin change d'allure et se parcourt autrement. Les réglages, les événements et le photobooth

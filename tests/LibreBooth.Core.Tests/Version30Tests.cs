@@ -255,7 +255,9 @@ public sealed class ReadinessTests
     {
         Assert.Equal(ReadinessLevel.Warning, Item(Ready with { DemoMode = true }, ReadinessArea.Camera).Level);
         Assert.Equal(ReadinessLevel.Warning, Item(Ready with { CameraKind = CameraKind.Demo }, ReadinessArea.Camera).Level);
-        Assert.Equal(ReadinessLevel.Error, Item(Ready with { CanonSdkMissing = true, CameraState = CameraState.Error }, ReadinessArea.Camera).Level);
+        // Depuis la 3.1.0, le SDK Canon ne manque que s'il est le pilote choisi.
+        Assert.Equal(ReadinessLevel.Error, Item(Ready with { CameraDriver = CameraDriver.CanonSdk, CanonSdkMissing = true, CameraState = CameraState.Error },
+            ReadinessArea.Camera).Level);
         // En démonstration, le SDK Canon ne sert pas.
         Assert.Equal(ReadinessLevel.Warning, Item(Ready with { CameraKind = CameraKind.Demo, CanonSdkMissing = true }, ReadinessArea.Camera).Level);
     }

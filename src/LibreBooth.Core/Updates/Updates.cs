@@ -13,7 +13,18 @@ public sealed record UpdateFile(string Name, Uri Url, long Size, string? Sha256)
 
 /// <summary>Une version de LibreBooth publiée sur GitHub (page « Releases »).</summary>
 /// <param name="Checksums">Le fichier LibreBooth-x.y.z-SHA256.txt publié avec la version, s'il existe.</param>
-public sealed record UpdateInfo(Version Version, string Tag, string Notes, Uri PageUrl, UpdateFile Installer, UpdateFile? Checksums);
+/// <param name="IsPrerelease">Pré-version (version d'essai) : proposée seulement si l'admin le demande (depuis la 3.1.0).</param>
+public sealed record UpdateInfo(Version Version, string Tag, string Notes, Uri PageUrl, UpdateFile Installer, UpdateFile? Checksums,
+    bool IsPrerelease = false);
+
+/// <summary>Ce que la recherche a trouvé parmi les versions publiées.</summary>
+/// <param name="Update">Version plus récente que celle installée, à proposer (null : à jour).</param>
+/// <param name="ReturnToStable">
+/// Dernière version stable, quand la version installée est plus récente qu'elle (une pré-version) : l'admin propose d'y
+/// revenir. Null sinon.
+/// </param>
+/// <param name="LatestStable">Dernière version stable publiée (null : aucune).</param>
+public sealed record UpdateChoice(UpdateInfo? Update, UpdateInfo? ReturnToStable, UpdateInfo? LatestStable);
 
 /// <summary>
 /// Recherche d'une nouvelle version de LibreBooth sur GitHub : seulement une lecture de la page publique des
@@ -22,7 +33,10 @@ public sealed record UpdateInfo(Version Version, string Tag, string Notes, Uri P
 public static partial class UpdateChecker
 {
     public const string Repository = "loisgoncalves/LibreBooth";
+    /// <summary>La dernière version stable seulement (GitHub y écarte les pré-versions et les brouillons).</summary>
     public static readonly Uri LatestReleaseUri = new($"https://api.github.com/repos/{Repository}/releases/latest");
+    /// <summary>Les dernières versions publiées, pré-versions comprises (les plus récentes d'abord).</summary>
+    public static readonly Uri ReleasesUri = new($"https://api.github.com/repos/{Repository}/releases?per_page=30");
     public static readonly Uri ReleasesPage = new($"https://github.com/{Repository}/releases");
 
     public static HttpClient CreateHttpClient(string appVersion, TimeSpan timeout)
@@ -51,15 +65,48 @@ public static partial class UpdateChecker
     private static Version Normalize(Version v) => new(v.Major, v.Minor, Math.Max(0, v.Build));
 
     /// <summary>
-    /// Lit la réponse de GitHub pour la dernière version. Null si elle n'est pas utilisable : brouillon, préversion,
-    /// numéro illisible, ou pas de programme d'installation parmi ses fichiers.
+    /// Choisit parmi les versions publiées : la plus récente, si elle est plus récente que celle installée (pré-versions
+    /// comprises seulement si <paramref name="includePrereleases"/>), et la dernière version stable, à laquelle revenir
+    /// quand la version installée est plus récente qu'elle.
+    /// </summary>
+    public static UpdateChoice Choose(IEnumerable<UpdateInfo> releases, Version current, bool includePrereleases)
+    {
+        var all = releases.ToList();
+        var stable = all.Where(r => !r.IsPrerelease).OrderByDescending(r => Normalize(r.Version)).FirstOrDefault();
+        // À numéro égal, la version stable passe avant la pré-version.
+        var newest = all.Where(r => includePrereleases || !r.IsPrerelease)
+            .OrderByDescending(r => Normalize(r.Version)).ThenBy(r => r.IsPrerelease).FirstOrDefault();
+        var returnTo = stable != null && Normalize(stable.Version) < Normalize(current) ? stable : null;
+        return new UpdateChoice(newest != null && IsNewer(newest, current) ? newest : null, returnTo, stable);
+    }
+
+    /// <summary>
+    /// Lit la réponse de GitHub pour la dernière version stable. Null si elle n'est pas utilisable : brouillon,
+    /// pré-version, numéro illisible, ou pas de programme d'installation parmi ses fichiers.
     /// </summary>
     public static UpdateInfo? ParseRelease(string json)
     {
         using var document = JsonDocument.Parse(json);
+        return Read(document.RootElement) is { IsPrerelease: false } info ? info : null;
+    }
+
+    /// <summary>
+    /// Lit la réponse de GitHub : une liste de versions (adresse « releases »), ou une seule (« releases/latest »).
+    /// Les pré-versions sont gardées et marquées ; les brouillons, les numéros illisibles et les versions sans programme
+    /// d'installation sont écartés.
+    /// </summary>
+    public static IReadOnlyList<UpdateInfo> ParseReleases(string json)
+    {
+        using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
+        var elements = root.ValueKind == JsonValueKind.Array ? root.EnumerateArray().ToList() : new List<JsonElement> { root };
+        return elements.Select(Read).OfType<UpdateInfo>().ToList();
+    }
+
+    private static UpdateInfo? Read(JsonElement root)
+    {
         if (root.ValueKind != JsonValueKind.Object) return null;
-        if (Bool(root, "draft") || Bool(root, "prerelease")) return null;
+        if (Bool(root, "draft")) return null;
         var tag = Text(root, "tag_name");
         if (!TryParseVersion(tag, out var version)) return null;
 
@@ -82,20 +129,23 @@ public static partial class UpdateChecker
         if (installer == null) return null;
 
         var page = Uri.TryCreate(Text(root, "html_url"), UriKind.Absolute, out var html) ? html : ReleasesPage;
-        return new UpdateInfo(version, tag!, ShortNotes(Text(root, "body") ?? ""), page, installer, checksums);
+        return new UpdateInfo(version, tag!, ShortNotes(Text(root, "body") ?? ""), page, installer, checksums, Bool(root, "prerelease"));
     }
 
-    /// <summary>Dernière version publiée ; null s'il n'y en a aucune d'utilisable.</summary>
-    public static async Task<UpdateInfo?> GetLatestAsync(HttpClient http, Uri source, CancellationToken cancellation)
+    /// <summary>
+    /// Versions publiées à l'adresse <paramref name="source"/> (<see cref="LatestReleaseUri"/> ou
+    /// <see cref="ReleasesUri"/>) ; liste vide s'il n'y en a aucune d'utilisable.
+    /// </summary>
+    public static async Task<IReadOnlyList<UpdateInfo>> GetReleasesAsync(HttpClient http, Uri source, CancellationToken cancellation)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, source);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
         using var response = await http.SendAsync(request, cancellation).ConfigureAwait(false);
         // Aucune version publiée.
-        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        if (response.StatusCode == HttpStatusCode.NotFound) return Array.Empty<UpdateInfo>();
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync(cancellation).ConfigureAwait(false);
-        return ParseRelease(json);
+        return ParseReleases(json);
     }
 
     /// <summary>

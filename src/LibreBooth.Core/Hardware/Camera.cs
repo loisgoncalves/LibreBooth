@@ -39,7 +39,7 @@ public sealed class CameraException : Exception
     }
 }
 
-/// <summary>Un appareil photo : le Canon (EDSDK) ou la caméra de démonstration.</summary>
+/// <summary>Un appareil photo : le Canon (par le pilote de Windows ou par le SDK Canon) ou la caméra de démonstration.</summary>
 public interface ICamera : IDisposable
 {
     string Name { get; }

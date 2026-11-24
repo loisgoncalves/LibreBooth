@@ -315,37 +315,80 @@ internal static class CaptureRunner
             Directory.GetFileSystemEntries(services.CurrentEvent.Folder).Select(p => Path.GetFileName(p))));
     }
 
+    /// <summary>
+    /// Mises à jour, page Système (assez haute pour voir toute la partie « Mises à jour ») : à jour, nouvelle version,
+    /// copie décompressée ; puis, depuis la 3.1.0, une pré-version proposée, une pré-version installée (avec l'accueil
+    /// qui le rappelle), et les deux à la fois.
+    /// </summary>
     private static async Task SnapUpdates(AppServices services, KioskViewModel kiosk, string folder, Action<string> note)
     {
-        var page = new Uri("https://github.com/loisgoncalves/LibreBooth/releases/tag/v3.1.0");
-        var fake = new UpdateInfo(new Version(3, 1, 0), "v3.1.0",
-            UpdateChecker.ShortNotes("**Exemple de nouveautés** : texte publié avec la version sur GitHub.\n\n- Première nouveauté\n- Deuxième nouveauté\n\n## Télécharger\n\n- fichiers"),
-            page, new UpdateFile("LibreBooth-3.1.0-Installation.exe", new Uri(page, "LibreBooth-3.1.0-Installation.exe"), 66_477_360, null), null);
-        foreach (var (update, installed, name) in new (UpdateInfo?, bool, string)[]
+        var newer = FakeRelease(new Version(3, 2, 0), prerelease: false, 89_067_000);
+        var preview = FakeRelease(new Version(3, 2, 0), prerelease: true, 89_067_000);
+        // Dernière version stable plus ancienne que celle-ci : la version en marche passe pour une pré-version.
+        var stable = FakeRelease(new Version(3, 0, 0), prerelease: false, 89_049_000);
+        foreach (var (update, returnTo, prereleases, installed, name) in new (UpdateInfo?, UpdateInfo?, bool, bool, string)[]
                  {
-                     (null, true, "25-mises-a-jour-a-jour"),
-                     (fake, true, "25b-mise-a-jour-disponible"),
-                     (fake, false, "25c-mise-a-jour-copie-decompressee"),
+                     (null, null, false, true, "25-mises-a-jour-a-jour"),
+                     (newer, null, false, true, "25b-mise-a-jour-disponible"),
+                     (newer, null, false, false, "25c-mise-a-jour-copie-decompressee"),
+                     (preview, null, true, true, "25d-pre-version-disponible"),
+                     (preview, null, false, true, "25e-pre-version-non-demandee"),
+                     (null, stable, false, true, "25f-pre-version-installee"),
+                     (preview, stable, true, true, "25g-pre-version-installee-et-plus-recente"),
                  })
         {
+            services.Settings.IncludePrereleases = prereleases;
             AppServices.InstalledCopyForCapture = installed;
-            services.ShowUpdateForCapture(update);
-            var admin = new AdminWindow(services, kiosk);
-            admin.LoadForCapture();
-            admin.ShowPage(AdminPage.System);
-            await Task.Delay(400);
-            if (admin.Content is FrameworkElement content)
+            services.ShowUpdateForCapture(update, returnTo);
+            var views = new List<(AdminPage Page, AdminAppearance Appearance, string Suffix)> { (AdminPage.System, AdminAppearance.Light, "") };
+            if (returnTo != null) views.Add((AdminPage.Home, AdminAppearance.Light, "-accueil"));
+            // Mise en garde et retour à la version stable : aussi en sombre.
+            if (returnTo != null && update != null) views.Add((AdminPage.System, AdminAppearance.Dark, "-sombre"));
+            foreach (var (page, appearance, suffix) in views)
             {
-                admin.Content = null;
-                Render(content, Path.Combine(folder, name + ".png"), 1600, 1000);
+                AdminTheme.Apply(appearance);
+                var admin = new AdminWindow(services, kiosk);
+                admin.LoadForCapture();
+                admin.ShowPage(page);
+                await Task.Delay(400);
+                var file = name + suffix;
+                if (admin.Content is FrameworkElement content)
+                {
+                    admin.Content = null;
+                    Render(content, Path.Combine(folder, file + ".png"), 1600, page == AdminPage.System ? 1900 : 1000);
+                }
+                if (page == AdminPage.System)
+                {
+                    note($"Mises à jour ({file}) : {admin.UpdateStatusText.Text} | bouton : "
+                         + (admin.InstallUpdateButton.Visibility == Visibility.Visible ? admin.InstallUpdateButton.Content : "aucun")
+                         + $" | mise en garde : {(admin.PrereleaseWarning.Visibility == Visibility.Visible ? admin.PrereleaseWarningText.Text : "aucune")}"
+                         + $" | retour : {(admin.ReturnToStablePanel.Visibility == Visibility.Visible ? $"{admin.ReturnToStableText.Text} [{(admin.ReturnToStableButton.Visibility == Visibility.Visible ? admin.ReturnToStableButton.Content : "sans bouton")}]" : "aucun")}"
+                         + $" | interrupteur pré-versions : {admin.PrereleasesSwitch.IsChecked}"
+                         + $" | bandeau : {(admin.UpdateBanner.Visibility == Visibility.Visible ? admin.UpdateBannerText.Text : "caché")}");
+                }
+                else
+                {
+                    note($"Accueil ({file}) : {admin.ReadinessSummaryText.Text} | "
+                         + string.Join(" | ", admin.ReadinessItemsForCapture.Select(i => $"{i.Title} ({i.Level}) : {i.Detail}")));
+                }
+                admin.CloseWithoutPrompt();
             }
-            note($"Mises à jour ({name}) : {admin.UpdateStatusText.Text} | bouton : "
-                 + (admin.InstallUpdateButton.Visibility == Visibility.Visible ? admin.InstallUpdateButton.Content : "aucun")
-                 + $" | bandeau : {(admin.UpdateBanner.Visibility == Visibility.Visible ? admin.UpdateBannerText.Text : "caché")}");
-            admin.CloseWithoutPrompt();
         }
+        AdminTheme.Apply(services.Settings.AdminAppearance);
+        services.Settings.IncludePrereleases = false;
         AppServices.InstalledCopyForCapture = null;
         services.ShowUpdateForCapture(null);
+    }
+
+    /// <summary>Une version fictive publiée sur GitHub, pour les captures des mises à jour.</summary>
+    private static UpdateInfo FakeRelease(Version version, bool prerelease, long size)
+    {
+        var number = version.ToString(3);
+        var page = new Uri($"https://github.com/loisgoncalves/LibreBooth/releases/tag/v{number}");
+        var installer = $"LibreBooth-{number}-Installation.exe";
+        return new UpdateInfo(version, "v" + number,
+            UpdateChecker.ShortNotes("**Exemple de nouveautés** : texte publié avec la version sur GitHub.\n\n- Première nouveauté\n- Deuxième nouveauté\n\n## Télécharger\n\n- fichiers"),
+            page, new UpdateFile(installer, new Uri(page, installer), size, null), null, prerelease);
     }
 
     /// <summary>

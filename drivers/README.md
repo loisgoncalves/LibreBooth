@@ -5,7 +5,7 @@ sont jamais publiés (ils sont exclus par `.gitignore`) : ils appartiennent à C
 
 | Dossier | Fichiers | Où les trouver |
 |---|---|---|
-| `drivers\canon\` | `EDSDK.dll`, `EdsImage.dll` (version **32 bits**) | SDK Canon EDSDK, gratuit sur inscription au programme développeurs de Canon |
+| `drivers\canon\` | `EDSDK.dll`, `EdsImage.dll` (version **32 bits**), facultatifs : seulement pour le pilote de secours « SDK Canon » | SDK Canon EDSDK, gratuit sur inscription au programme développeurs de Canon |
 | `drivers\dnp\` | `cspstat.dll` (facultatif) | API d'état des imprimantes DNP, auprès de DNP |
 
 Présents ici, ils sont copiés à côté de `LibreBooth.exe` à la compilation. La version publique se fabrique sans eux

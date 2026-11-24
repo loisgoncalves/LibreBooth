@@ -32,7 +32,7 @@
             </DockPanel>
         </Border>
 
-        <!-- SDK Canon manquant : il ne peut pas être livré avec LibreBooth, on aide à l'ajouter. -->
+        <!-- SDK Canon choisi en secours mais manquant : il ne peut pas être livré avec LibreBooth, on aide à l'ajouter. -->
         <Border x:Name="CanonSdkBanner" Grid.Row="1" Style="{StaticResource WarningBar}" CornerRadius="0" Padding="20,12" Visibility="Collapsed">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -42,9 +42,9 @@
                 <TextBlock Text="&#xE7BA;" FontFamily="{DynamicResource IconFont}" FontSize="20" Foreground="{DynamicResource Admin.Warning}"
                            Margin="0,1,12,0" VerticalAlignment="Top" />
                 <StackPanel Grid.Column="1">
-                    <TextBlock Text="Il manque le SDK Canon (pilote de l'appareil photo)" FontWeight="SemiBold" />
+                    <TextBlock Text="Il manque le SDK Canon, choisi comme pilote de l'appareil photo" FontWeight="SemiBold" />
                     <TextBlock TextWrapping="Wrap" Margin="0,2,0,6"
-                               Text="Il appartient à Canon et ne peut pas être fourni avec LibreBooth. 1. Ouvrez la page Canon, inscrivez-vous (gratuit) et téléchargez le SDK « EDSDK » pour Windows. 2. Indiquez le fichier zip téléchargé : LibreBooth en extrait lui-même les bons fichiers." />
+                               Text="Il appartient à Canon et ne peut pas être fourni avec LibreBooth. 1. Ouvrez la page Canon, inscrivez-vous (gratuit) et téléchargez le SDK « EDSDK » pour Windows. 2. Indiquez le fichier zip téléchargé : LibreBooth en extrait lui-même les bons fichiers. Ou revenez au pilote de Windows (admin › Appareil photo) : rien à installer." />
                     <WrapPanel>
                         <Button Content="1. Ouvrir la page Canon" infra:AdminUi.Glyph="&#xE8A7;" Click="OpenCanonPage_Click" />
                         <Button x:Name="CanonSdkImportButton" Content="2. Ajouter le SDK Canon…" infra:AdminUi.Glyph="&#xE8B5;" Style="{StaticResource AccentButton}"

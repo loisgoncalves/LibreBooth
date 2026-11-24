@@ -112,7 +112,7 @@ public sealed class UpdateTests : IDisposable
     public async Task No_published_release_means_no_update()
     {
         using var http = new HttpClient(new FakeServer());
-        Assert.Null(await UpdateChecker.GetLatestAsync(http, UpdateChecker.LatestReleaseUri, CancellationToken.None));
+        Assert.Empty(await UpdateChecker.GetReleasesAsync(http, UpdateChecker.LatestReleaseUri, CancellationToken.None));
     }
 
     [Fact]
@@ -121,9 +121,99 @@ public sealed class UpdateTests : IDisposable
         var server = new FakeServer { [UpdateChecker.LatestReleaseUri.ToString()] = Encoding.UTF8.GetBytes(ReleaseJson()) };
         using var http = new HttpClient(server);
 
-        var info = await UpdateChecker.GetLatestAsync(http, UpdateChecker.LatestReleaseUri, CancellationToken.None);
+        var releases = await UpdateChecker.GetReleasesAsync(http, UpdateChecker.LatestReleaseUri, CancellationToken.None);
 
-        Assert.Equal(new Version(2, 1, 0), info?.Version);
+        Assert.Equal(new Version(2, 1, 0), Assert.Single(releases).Version);
+    }
+
+    // ---------------------------------------------------------------- Pré-versions (3.1.0)
+
+    private static string ListJson(params string[] releases) => "[" + string.Join(",", releases) + "]";
+
+    private static IReadOnlyList<UpdateInfo> Releases(params (string Tag, bool Prerelease)[] releases) =>
+        UpdateChecker.ParseReleases(ListJson(releases.Select(r => ReleaseJson(r.Tag, r.Prerelease)).ToArray()));
+
+    [Fact]
+    public async Task The_list_of_releases_keeps_previews_and_drops_drafts()
+    {
+        var draft = ReleaseJson("v3.3.0").Replace("\"draft\": false", "\"draft\": true");
+        var server = new FakeServer
+        {
+            [UpdateChecker.ReleasesUri.ToString()] = Encoding.UTF8.GetBytes(ListJson(draft, ReleaseJson("v3.2.0", prerelease: true), ReleaseJson("v3.1.0"))),
+        };
+        using var http = new HttpClient(server);
+
+        var releases = await UpdateChecker.GetReleasesAsync(http, UpdateChecker.ReleasesUri, CancellationToken.None);
+
+        Assert.Equal(new[] { ("3.2.0", true), ("3.1.0", false) }, releases.Select(r => (r.Version.ToString(3), r.IsPrerelease)));
+        Assert.Equal(UpdateChecker.ReleasesUri.ToString(), Assert.Single(server.Requests));
+    }
+
+    [Fact]
+    public void Previews_are_offered_only_when_asked()
+    {
+        var releases = Releases(("v3.2.0", true), ("v3.1.0", false), ("v3.0.0", false));
+        var current = new Version(3, 1, 0);
+
+        Assert.Null(UpdateChecker.Choose(releases, current, includePrereleases: false).Update);
+        var choice = UpdateChecker.Choose(releases, current, includePrereleases: true);
+        Assert.Equal(new Version(3, 2, 0), choice.Update?.Version);
+        Assert.True(choice.Update?.IsPrerelease);
+        Assert.Null(choice.ReturnToStable);
+        Assert.Equal(new Version(3, 1, 0), choice.LatestStable?.Version);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_newer_stable_version_is_offered_whatever_the_setting(bool includePrereleases)
+    {
+        var releases = Releases(("v3.2.1", false), ("v3.2.0", true), ("v3.1.0", false));
+
+        var update = UpdateChecker.Choose(releases, new Version(3, 1, 0), includePrereleases).Update;
+
+        Assert.Equal(new Version(3, 2, 1), update?.Version);
+        Assert.False(update?.IsPrerelease);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void From_a_preview_the_latest_stable_version_is_offered_to_return_to(bool includePrereleases)
+    {
+        var releases = Releases(("v3.2.0", true), ("v3.1.0", false));
+
+        var choice = UpdateChecker.Choose(releases, new Version(3, 2, 0), includePrereleases);
+
+        Assert.Null(choice.Update);
+        Assert.Equal(new Version(3, 1, 0), choice.ReturnToStable?.Version);
+    }
+
+    [Fact]
+    public void A_preview_that_became_the_stable_version_is_not_offered_again()
+    {
+        // La 3.1.0 essayée en pré-version, puis passée en version normale : même numéro, rien à proposer.
+        var choice = UpdateChecker.Choose(Releases(("v3.1.0", false), ("v3.0.0", false)), new Version(3, 1, 0), includePrereleases: true);
+
+        Assert.Null(choice.Update);
+        Assert.Null(choice.ReturnToStable);
+    }
+
+    [Fact]
+    public void The_stable_version_wins_over_a_preview_with_the_same_number()
+    {
+        var choice = UpdateChecker.Choose(Releases(("3.2.0", true), ("v3.2.0", false)), new Version(3, 1, 0), includePrereleases: true);
+
+        Assert.False(choice.Update?.IsPrerelease);
+    }
+
+    [Fact]
+    public void The_latest_address_still_gives_a_single_stable_release()
+    {
+        var releases = UpdateChecker.ParseReleases(ReleaseJson());
+
+        Assert.False(Assert.Single(releases).IsPrerelease);
+        Assert.Empty(UpdateChecker.ParseReleases("[]"));
     }
 
     [Fact]

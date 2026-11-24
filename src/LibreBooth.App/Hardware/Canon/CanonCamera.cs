@@ -8,7 +8,8 @@ using static LibreBooth.App.Hardware.Canon.EdsdkNative;
 namespace LibreBooth.App.Hardware.Canon;
 
 /// <summary>
-/// Appareil Canon EOS (testé pour le 1300D) piloté par le SDK Canon.
+/// Appareil Canon EOS (testé pour le 1300D) piloté par le SDK Canon : depuis la 3.1.0, le pilote de secours, quand
+/// celui de Windows (<see cref="CanonWindowsCamera"/>) ne sait pas piloter l'appareil.
 /// Tous les appels au SDK passent par un seul thread dédié, avec sa propre boucle de messages (exigence Canon).
 /// La connexion est surveillée en permanence : un débranchement est détecté et l'appareil se reconnecte seul.
 /// </summary>
@@ -109,7 +110,7 @@ internal sealed class CanonCamera : ICamera
         {
             _log.Error(ex, "EDSDK.dll introuvable");
             SetState(CameraState.Error,
-                "Pilote Canon introuvable : ajoutez le SDK Canon (admin › Appareil photo › « Ajouter le SDK Canon… »).");
+                "Pilote Canon introuvable : ajoutez le SDK Canon (admin › Appareil photo › « Ajouter le SDK Canon… ») ou revenez au « Pilote de Windows ».");
         }
         catch (BadImageFormatException ex)
         {
@@ -218,8 +219,8 @@ internal sealed class CanonCamera : ICamera
 
     private void ConfigureSession()
     {
-        var saveTo = _settings().SaveToCardToo ? SaveTo_Both : SaveTo_Host;
-        var error = SetUInt32(PropID_SaveTo, saveTo);
+        // Photos envoyées au PC seulement (la copie sur la carte SD est retirée en 3.1.0).
+        var error = SetUInt32(PropID_SaveTo, SaveTo_Host);
         if (error != EDS_ERR_OK) _log.Warning("Réglage « enregistrer sur le PC » refusé : {Error}", EdsdkErrors.Describe(error));
 
         // Le SDK exige d'annoncer de la place libre côté PC, sinon l'appareil refuse de déclencher.
