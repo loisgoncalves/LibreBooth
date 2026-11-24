@@ -8,6 +8,13 @@ public enum CameraKind
     Demo,
 }
 
+/// <summary>Apparence des fenêtres de l'admin (le photobooth des invités garde les couleurs de l'événement).</summary>
+public enum AdminAppearance
+{
+    Light,
+    Dark,
+}
+
 /// <summary>Tous les réglages de LibreBooth, enregistrés dans config.json.</summary>
 public sealed class AppSettings
 {
@@ -17,6 +24,8 @@ public sealed class AppSettings
     public bool LaunchAtStartup { get; set; }
     /// <summary>Au lancement, demande à GitHub s'il existe une nouvelle version (proposée ensuite dans l'admin).</summary>
     public bool CheckForUpdates { get; set; } = true;
+    /// <summary>Admin en clair ou en sombre (depuis la 3.0.0 ; une version plus ancienne ignore ce réglage).</summary>
+    public AdminAppearance AdminAppearance { get; set; } = AdminAppearance.Light;
     public CameraSettings Camera { get; set; } = new();
     public PrintSettings Print { get; set; } = new();
     public ScreenSettings Screens { get; set; } = new();
@@ -30,6 +39,7 @@ public sealed class AppSettings
         Print ??= new();
         Screens ??= new();
         if (string.IsNullOrWhiteSpace(AdminPin) || AdminPin.Length < 4 || !AdminPin.All(char.IsDigit)) AdminPin = "1234";
+        if (!Enum.IsDefined(AdminAppearance)) AdminAppearance = AdminAppearance.Light;
 
         Camera.Rotation = Camera.Rotation switch { 90 or 180 or 270 => Camera.Rotation, _ => 0 };
         Camera.CaptureTimeoutSeconds = Math.Clamp(Camera.CaptureTimeoutSeconds, 4, 60);

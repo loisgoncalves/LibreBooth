@@ -3,6 +3,7 @@ using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LibreBooth.App.Infrastructure;
 using LibreBooth.App.Services;
+using LibreBooth.Core.Admin;
 using LibreBooth.Core.Events;
 using LibreBooth.Core.Hardware;
 using LibreBooth.Core.Layouts;
@@ -29,6 +30,7 @@ public sealed partial class KioskViewModel : ObservableObject
     private CancellationTokenSource? _sessionCancellation;
     private SessionData? _session;
     private bool _paused;
+    private bool _diskFull;
 
     [ObservableProperty] private object? _currentScreen;
 
@@ -60,7 +62,7 @@ public sealed partial class KioskViewModel : ObservableObject
         _machine.StateChanged += OnStateChanged;
         services.CameraChanged += (_, _) => _dispatcher.BeginInvoke(AttachCamera);
         services.EventChanged += (_, _) => _dispatcher.BeginInvoke(RefreshFromSettings);
-        services.PrinterMonitor.Changed += (_, _) => RefreshPrinterState();
+        services.PrinterMonitor.Changed += (_, _) => RefreshOperatorWarning();
 
         AttachCamera();
         RefreshFromSettings();
@@ -103,11 +105,15 @@ public sealed partial class KioskViewModel : ObservableObject
 
     private void OnCameraStatusChanged(object? sender, CameraStatusEventArgs e) => _dispatcher.BeginInvoke(UpdateCameraReadiness);
 
+    /// <summary>L'accueil n'accepte de session qu'avec l'appareil prêt et assez de place sur le disque des photos.</summary>
     private void UpdateCameraReadiness()
     {
         var camera = _services.Camera;
-        Attract.IsReady = camera.State == CameraState.Ready;
-        Attract.NotReadyMessage = camera.StatusMessage;
+        Attract.IsReady = camera.State == CameraState.Ready && !_diskFull;
+        Attract.NotReadyTitle = _diskFull ? "Le photobooth fait une pause" : "Le photobooth se prépare…";
+        Attract.NotReadyMessage = _diskFull
+            ? "Plus assez de place pour enregistrer les photos : prévenez l'animateur."
+            : camera.StatusMessage;
     }
 
     // ---------------------------------------------------------------- Réglages et imprimante
@@ -124,15 +130,36 @@ public sealed partial class KioskViewModel : ObservableObject
         Attract.Background = ImageLoader.FromFile(_services.CurrentAttractBackground(), decodePixelWidth: 1920);
         Shooting.MirrorScaleX = settings.Camera.MirrorLiveView ? -1 : 1;
         Shooting.RotationAngle = settings.Camera.Rotation;
-        RefreshPrinterState();
+        RefreshOperatorWarning();
         UpdateCameraReadiness();
     }
 
-    private void RefreshPrinterState()
+    /// <summary>
+    /// Avertissement de l'animateur sur l'accueil : disque presque plein (les sessions s'arrêtent sous 300 Mo libres),
+    /// puis imprimante, puis papier. Recalculé au retour à l'accueil, avant chaque session et à chaque bilan de
+    /// l'imprimante (toutes les 15 s) : dès que de la place est libérée, les sessions reprennent.
+    /// </summary>
+    private void RefreshOperatorWarning()
     {
+        var disk = _services.ProbePhotoDisk();
+        var diskFull = disk is { } probe && !DiskSpace.AllowsSession(probe.FreeBytes);
+        if (diskFull != _diskFull)
+        {
+            _diskFull = diskFull;
+            if (diskFull)
+                _log.Warning("Disque presque plein ({Free} libres sur {Drive}) : plus de nouvelle session", Readiness.Size(disk!.Value.FreeBytes), disk.Value.DriveName);
+            else
+                _log.Information("Place libérée sur le disque des photos : les sessions reprennent");
+            UpdateCameraReadiness();
+        }
+
         var settings = _services.Settings.Print;
         var health = _services.PrinterMonitor.Current;
-        if (!settings.Enabled)
+        if (diskFull)
+        {
+            Attract.OperatorWarning = $"Disque presque plein : sessions en pause ({Readiness.Size(disk!.Value.FreeBytes)} libres)";
+        }
+        else if (!settings.Enabled)
         {
             Attract.OperatorWarning = null;
         }
@@ -221,11 +248,17 @@ public sealed partial class KioskViewModel : ObservableObject
             _log.Information("Démarrage refusé : appareil pas prêt ({Message})", _services.Camera.StatusMessage);
             return;
         }
+        RefreshOperatorWarning();
+        if (_diskFull)
+        {
+            _log.Information("Démarrage refusé : disque presque plein");
+            return;
+        }
 
         var templates = _services.ActiveTemplates();
         if (templates.Count == 0)
         {
-            _machine.Fail("Aucun modèle actif : choisissez-en un dans l'admin (onglet Modèles).");
+            _machine.Fail("Aucun format proposé : cochez-en au moins un dans l'admin (page Personnalisation).");
             return;
         }
         if (templates.Count == 1)
@@ -560,6 +593,7 @@ public sealed partial class KioskViewModel : ObservableObject
         _paused = false;
         _machine.Reset();
         OnPropertyChanged(nameof(IsIdle));
+        RefreshOperatorWarning();
     }
 
     public void ShowError(string message)

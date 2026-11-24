@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using LibreBooth.App.Infrastructure;
 
 namespace LibreBooth.App.Admin;
 
@@ -10,12 +11,13 @@ public enum LeaveBoothChoice
     Quit,
 }
 
-/// <summary>Après le code PIN, depuis le photobooth : revenir à l'admin ou quitter LibreBooth.</summary>
+/// <summary>Après le code PIN, depuis le photobooth : revenir à l'admin ou quitter LibreBooth (aux couleurs de l'admin).</summary>
 public partial class LeaveBoothWindow : Window
 {
     public LeaveBoothWindow()
     {
         InitializeComponent();
+        AdminTheme.Attach(this);
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key != Key.Escape) return;

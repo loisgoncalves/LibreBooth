@@ -7,6 +7,7 @@ using LibreBooth.App.Admin;
 using LibreBooth.App.Infrastructure;
 using LibreBooth.App.Kiosk;
 using LibreBooth.App.Services;
+using LibreBooth.Core.Config;
 using LibreBooth.Core.Design;
 using LibreBooth.Core.Hardware;
 using LibreBooth.Core.Layouts;
@@ -116,6 +117,7 @@ internal static class CaptureRunner
             await SnapKioskThemes(services, kiosk, folder, Note);
             await SnapVersion14(services, kiosk, folder, Note);
             await SnapVersion20(services, kiosk, folder, Note);
+            await SnapVersion30(services, kiosk, folder, Note);
 
             var stats = services.CurrentEvent.Info.Stats;
             Note($"Statistiques de l'événement : {stats.Sessions} sessions, {stats.Photos} photos, {stats.Prints} impressions, {stats.Retakes} série(s) recommencée(s)");
@@ -167,50 +169,89 @@ internal static class CaptureRunner
         host.Content = null;
     }
 
+    /// <summary>Les pages de l'admin, dans l'ordre du menu, avec le nom de leur image.</summary>
+    private static readonly (AdminPage Page, string Name)[] AdminPages =
+    {
+        (AdminPage.Home, "12-admin-accueil"), (AdminPage.Event, "13-admin-evenement"), (AdminPage.Customization, "14-admin-personnalisation"),
+        (AdminPage.Camera, "16-admin-appareil"), (AdminPage.Print, "17-admin-impression"), (AdminPage.Screens, "18-admin-ecrans"),
+        (AdminPage.System, "19-admin-systeme"),
+    };
+
     private static async Task SnapAdmin(AppServices services, KioskViewModel kiosk, string folder)
     {
-        // Comme au lancement de LibreBooth : bandeau d'accueil et bouton « Démarrer le photobooth ».
-        var admin = new AdminWindow(services, kiosk);
-        admin.LoadForCapture();
-        await Task.Delay(500);
-        if (admin.Content is not FrameworkElement content) return;
-        admin.Content = null;
-        foreach (var (index, name) in new[]
-                 {
-                     (0, "12-admin-evenement"), (1, "13-admin-personnalisation"), (3, "14-admin-impression"), (4, "15-admin-modeles"),
-                     (5, "17-admin-ecrans"), (7, "19-admin-systeme"),
-                 })
+        // Chaque page en clair, en sombre, puis en clair avec la police d'icônes de Windows 10 (Segoe MDL2 Assets).
+        // Une fenêtre par variante : dessinées hors écran, les pages gardent les couleurs et la police de leur création.
+        try
         {
-            admin.AdminTabs.SelectedIndex = index;
-            // L'aperçu et les vignettes de la personnalisation se préparent en arrière-plan.
-            await Task.Delay(index == 1 ? 4000 : 300);
-            Render(content, Path.Combine(folder, name + ".png"), 1600, 1000);
-            if (index != 1) continue;
-            foreach (var (offset, suffix) in new[] { (820.0, "b"), (1640.0, "c"), (2460.0, "d") })
+            foreach (var (appearance, windows10, variant) in new[]
+                     {
+                         (AdminAppearance.Light, false, ""), (AdminAppearance.Dark, false, "-sombre"), (AdminAppearance.Light, true, "-w10"),
+                     })
             {
-                admin.CustomizationTab.ScrollSettings(offset);
-                await Task.Delay(300);
-                Render(content, Path.Combine(folder, name + suffix + ".png"), 1600, 1000);
-            }
-            admin.CustomizationTab.ShowAttractPreviewForCapture();
-            await Task.Delay(1500);
-            Render(content, Path.Combine(folder, name + "e-apercu-accueil.png"), 1600, 1000);
+                AdminTheme.Apply(appearance);
+                if (windows10) Application.Current.Resources["IconFont"] = new FontFamily("Segoe MDL2 Assets");
+                else Application.Current.Resources.Remove("IconFont");
 
-            // Mode « Mes propres images », avec le gabarit du 10x15 importé comme fond.
-            var guide = Path.Combine(folder, "fond-essai-10x15.png");
-            DesignGuide.WritePng(TemplateSeeder.CreatePostcard(), guide);
-            CustomizationStore.ImportBackground(services.CurrentEvent.Folder, services.Customization, DesignStyles.Postcard, guide, 1800, 1200);
-            admin.CustomizationTab.LoadFromEvent();
-            admin.CustomizationTab.ScrollSettings(0);
-            await Task.Delay(3000);
-            Render(content, Path.Combine(folder, name + "f-mes-propres-images.png"), 1600, 1000);
-            CustomizationStore.RemoveBackground(services.CurrentEvent.Folder, services.Customization, DesignStyles.Postcard);
-            services.Customization.Design.OwnImages = false;
-            services.SaveCustomization();
-            admin.CustomizationTab.LoadFromEvent();
-            admin.CustomizationTab.ScrollSettings(0);
+                // Comme au lancement de LibreBooth : la page Accueil et le bouton « Démarrer le photobooth ».
+                var admin = new AdminWindow(services, kiosk);
+                admin.LoadForCapture();
+                await Task.Delay(500);
+                if (admin.Content is FrameworkElement content)
+                {
+                    admin.Content = null;
+                    foreach (var (page, name) in AdminPages)
+                    {
+                        admin.ShowPage(page);
+                        // L'aperçu et les vignettes de la personnalisation se préparent en arrière-plan.
+                        await Task.Delay(page == AdminPage.Customization ? 4000 : 400);
+                        Render(content, Path.Combine(folder, name + variant + ".png"), 1600, 1000);
+                    }
+                    if (variant.Length == 0) await SnapCustomization(services, admin, content, folder);
+                }
+                admin.CloseWithoutPrompt();
+            }
         }
-        admin.CloseWithoutPrompt();
+        finally
+        {
+            Application.Current.Resources.Remove("IconFont");
+            AdminTheme.Apply(services.Settings.AdminAppearance);
+        }
+    }
+
+    /// <summary>Personnalisation : la suite des réglages, l'aperçu de l'accueil, les modèles, puis « Mes propres images ».</summary>
+    private static async Task SnapCustomization(AppServices services, AdminWindow admin, FrameworkElement content, string folder)
+    {
+        const string customization = "14-admin-personnalisation";
+        admin.ShowPage(AdminPage.Customization);
+        foreach (var (offset, suffix) in new[] { (820.0, "b"), (1640.0, "c"), (2460.0, "d") })
+        {
+            admin.CustomizationView.ScrollSettings(offset);
+            await Task.Delay(300);
+            Render(content, Path.Combine(folder, customization + suffix + ".png"), 1600, 1000);
+        }
+        admin.CustomizationView.ShowAttractPreviewForCapture();
+        await Task.Delay(1500);
+        Render(content, Path.Combine(folder, customization + "e-apercu-accueil.png"), 1600, 1000);
+
+        admin.CustomizationView.ShowTemplatesForCapture();
+        await Task.Delay(1500);
+        admin.CustomizationView.ShowTemplatesForCapture();
+        Render(content, Path.Combine(folder, "15-admin-modeles.png"), 1600, 1000);
+
+        // Mode « Mes propres images », avec le gabarit du 10x15 importé comme fond.
+        var guide = Path.Combine(folder, "fond-essai-10x15.png");
+        DesignGuide.WritePng(TemplateSeeder.CreatePostcard(), guide);
+        CustomizationStore.ImportBackground(services.CurrentEvent.Folder, services.Customization, DesignStyles.Postcard, guide, 1800, 1200);
+        admin.CustomizationView.LoadFromEvent();
+        admin.CustomizationView.ShowFormatPreviewForCapture();
+        admin.CustomizationView.ScrollSettings(0);
+        await Task.Delay(3000);
+        Render(content, Path.Combine(folder, customization + "f-mes-propres-images.png"), 1600, 1000);
+        CustomizationStore.RemoveBackground(services.CurrentEvent.Folder, services.Customization, DesignStyles.Postcard);
+        services.Customization.Design.OwnImages = false;
+        services.SaveCustomization();
+        admin.CustomizationView.LoadFromEvent();
+        admin.CustomizationView.ScrollSettings(0);
     }
 
     /// <summary>
@@ -219,31 +260,9 @@ internal static class CaptureRunner
     /// </summary>
     private static async Task SnapVersion14(AppServices services, KioskViewModel kiosk, string folder, Action<string> note)
     {
-        var verification = new VerificationWindow(services, services.Paths);
-        await verification.RunForCaptureAsync();
-        if (verification.Content is FrameworkElement verificationContent)
-        {
-            verification.Content = null;
-            Render(verificationContent, Path.Combine(folder, "20-verification.png"), 900, 760);
-        }
-        note("Vérification de l'installation : " + string.Join(" | ", verification.Results.Select(r => $"{r.Status} {r.Title}")));
-        verification.Close();
-
-        var pin = new PinWindow(services.Settings.AdminPin, "Code administrateur", "Code par défaut : 1234 (à changer dans l'onglet Système)", standalone: true);
-        if (pin.Content is FrameworkElement pinContent)
-        {
-            pin.Content = null;
-            RenderToContent(pinContent, Path.Combine(folder, "21-code-pin-au-lancement.png"), new SolidColorBrush(Color.FromRgb(0x1E, 0x20, 0x28)), Brushes.White);
-        }
-        pin.Close();
-
-        var leave = new LeaveBoothWindow();
-        if (leave.Content is FrameworkElement leaveContent)
-        {
-            leave.Content = null;
-            RenderToContent(leaveContent, Path.Combine(folder, "22-quitter-le-photobooth.png"), new SolidColorBrush(Color.FromRgb(0x1E, 0x20, 0x28)), Brushes.White);
-        }
-        leave.Close();
+        await SnapVerification(services, folder, "", note);
+        SnapPin(services, folder, "");
+        SnapLeave(folder, "");
 
         kiosk.ResumeAfterAdmin();
         await WaitUntil(() => kiosk.State == KioskState.Attract && kiosk.IsIdle, 5, "accueil du photobooth");
@@ -289,15 +308,7 @@ internal static class CaptureRunner
                      (true, new Core.Events.EventStore(Path.Combine(folder, "aucun-evenement")), "24c-choix-evenement-premier-lancement"),
                  })
         {
-            var chooser = new EventChooserWindow(events, services.CurrentEvent.Folder, atStartup);
-            chooser.LoadForCapture();
-            await Task.Delay(300);
-            if (chooser.Content is FrameworkElement content)
-            {
-                chooser.Content = null;
-                Render(content, Path.Combine(folder, name + ".png"), 1080, 720);
-            }
-            chooser.Close();
+            await SnapChooser(events, services.CurrentEvent.Folder, atStartup, Path.Combine(folder, name + ".png"));
         }
         note("Choix de l'événement : " + string.Join(" | ", services.Events.ListAll().Select(e => $"{e.Name} → {Path.GetFileName(e.Folder)}")));
         note("Dossier de l'événement en cours : " + string.Join(", ",
@@ -306,10 +317,10 @@ internal static class CaptureRunner
 
     private static async Task SnapUpdates(AppServices services, KioskViewModel kiosk, string folder, Action<string> note)
     {
-        var page = new Uri("https://github.com/loisgoncalves/LibreBooth/releases/tag/v2.1.0");
-        var fake = new UpdateInfo(new Version(2, 1, 0), "v2.1.0",
+        var page = new Uri("https://github.com/loisgoncalves/LibreBooth/releases/tag/v3.1.0");
+        var fake = new UpdateInfo(new Version(3, 1, 0), "v3.1.0",
             UpdateChecker.ShortNotes("**Exemple de nouveautés** : texte publié avec la version sur GitHub.\n\n- Première nouveauté\n- Deuxième nouveauté\n\n## Télécharger\n\n- fichiers"),
-            page, new UpdateFile("LibreBooth-2.1.0-Installation.exe", new Uri(page, "LibreBooth-2.1.0-Installation.exe"), 66_477_360, null), null);
+            page, new UpdateFile("LibreBooth-3.1.0-Installation.exe", new Uri(page, "LibreBooth-3.1.0-Installation.exe"), 66_477_360, null), null);
         foreach (var (update, installed, name) in new (UpdateInfo?, bool, string)[]
                  {
                      (null, true, "25-mises-a-jour-a-jour"),
@@ -321,7 +332,7 @@ internal static class CaptureRunner
             services.ShowUpdateForCapture(update);
             var admin = new AdminWindow(services, kiosk);
             admin.LoadForCapture();
-            admin.AdminTabs.SelectedItem = admin.SystemTab;
+            admin.ShowPage(AdminPage.System);
             await Task.Delay(400);
             if (admin.Content is FrameworkElement content)
             {
@@ -337,16 +348,142 @@ internal static class CaptureRunner
         services.ShowUpdateForCapture(null);
     }
 
-    /// <summary>Petite fenêtre (code PIN, choix) dessinée à sa taille naturelle.</summary>
-    private static void RenderToContent(FrameworkElement content, string path, Brush background, Brush foreground)
+    /// <summary>
+    /// Nouveautés 3.0.0 : les confirmations LibreBooth (l'avertissement d'espace disque avant « Démarrer le
+    /// photobooth », « Quitter LibreBooth ? ») en clair et en sombre, puis les autres fenêtres de l'admin en sombre.
+    /// Une fenêtre neuve par apparence : dessinées hors écran, elles gardent les couleurs de leur création.
+    /// Enfin, le disque presque plein.
+    /// </summary>
+    private static async Task SnapVersion30(AppServices services, KioskViewModel kiosk, string folder, Action<string> note)
     {
-        var root = new Border { Background = background, Child = content };
-        TextElement.SetForeground(root, foreground);
-        TextElement.SetFontFamily(root, new FontFamily("Segoe UI"));
-        root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        var size = root.DesiredSize;
-        Render(root, path, (int)Math.Ceiling(size.Width), (int)Math.Ceiling(size.Height));
-        root.Child = null;
+        await SnapDiskFull(services, kiosk, folder, note);
+        try
+        {
+            foreach (var (appearance, suffix) in new[] { (AdminAppearance.Light, ""), (AdminAppearance.Dark, "-sombre") })
+            {
+                AdminTheme.Apply(appearance);
+                SnapDialog(AdminWindow.LowDiskMessage(1536L * 1024 * 1024, "C:"), "Démarrer quand même", MessageBoxImage.Warning, false,
+                    Path.Combine(folder, $"26-confirmation-espace-disque{suffix}.png"));
+                SnapDialog("Quitter LibreBooth ?\n\nLe photobooth s'arrête : l'appareil photo et l'imprimante sont libérés.", "Quitter LibreBooth",
+                    MessageBoxImage.Question, true, Path.Combine(folder, $"26b-confirmation-quitter{suffix}.png"));
+                if (appearance != AdminAppearance.Dark) continue;
+
+                await SnapVerification(services, folder, suffix, null);
+                SnapPin(services, folder, suffix);
+                SnapLeave(folder, suffix);
+                await SnapChooser(services.Events, services.CurrentEvent.Folder, true, Path.Combine(folder, $"24-choix-evenement-au-lancement{suffix}.png"));
+                await SnapEditor(services, folder, suffix);
+            }
+            note("Version 3.0.0 : confirmations en clair et en sombre ; vérification, code PIN, quitter, choix de l'événement et éditeur en sombre");
+        }
+        finally
+        {
+            AdminTheme.Apply(services.Settings.AdminAppearance);
+        }
+    }
+
+    /// <summary>
+    /// Disque presque plein (simulé : 250 Mo libres) : l'accueil du photobooth se met en pause et prévient l'animateur,
+    /// un toucher ne lance pas de session, et l'accueil de l'admin le signale. Puis, la place « libérée », tout reprend.
+    /// </summary>
+    private static async Task SnapDiskFull(AppServices services, KioskViewModel kiosk, string folder, Action<string> note)
+    {
+        try
+        {
+            AppServices.FreeDiskBytesForCapture = 250L * 1024 * 1024;
+            kiosk.ResumeAfterAdmin();
+            await WaitUntil(() => kiosk.State == KioskState.Attract && !kiosk.Attract.IsReady, 5, "pause de l'accueil (disque presque plein)");
+            kiosk.StartSession();
+            await Task.Delay(300);
+            note($"Disque presque plein : accueil prêt = {kiosk.Attract.IsReady}, avertissement « {kiosk.Attract.OperatorWarning} », "
+                 + $"message « {kiosk.Attract.NotReadyMessage} », après un toucher : {kiosk.State}");
+            if (kiosk.State != KioskState.Attract) throw new InvalidOperationException("Une session a démarré malgré le disque presque plein.");
+            await Snap(kiosk, folder, "27-accueil-disque-presque-plein");
+
+            var admin = new AdminWindow(services, kiosk);
+            admin.LoadForCapture();
+            await Task.Delay(500);
+            if (admin.Content is FrameworkElement content)
+            {
+                admin.Content = null;
+                Render(content, Path.Combine(folder, "27b-admin-accueil-disque-presque-plein.png"), 1600, 1000);
+            }
+            admin.CloseWithoutPrompt();
+        }
+        finally
+        {
+            AppServices.FreeDiskBytesForCapture = null;
+            kiosk.ResumeAfterAdmin();
+        }
+        await WaitUntil(() => kiosk.Attract.IsReady, 5, "reprise des sessions une fois la place libérée");
+        note($"Place libérée : accueil prêt = {kiosk.Attract.IsReady}, avertissement : {kiosk.Attract.OperatorWarning ?? "aucun"}");
+    }
+
+    private static async Task SnapVerification(AppServices services, string folder, string suffix, Action<string>? note)
+    {
+        var verification = new VerificationWindow(services, services.Paths);
+        await verification.RunForCaptureAsync();
+        if (verification.Content is FrameworkElement content)
+        {
+            verification.Content = null;
+            Render(content, Path.Combine(folder, $"20-verification{suffix}.png"), 900, 760);
+        }
+        note?.Invoke("Vérification de l'installation : " + string.Join(" | ", verification.Results.Select(r => $"{r.Status} {r.Title}")));
+        verification.Close();
+    }
+
+    private static void SnapPin(AppServices services, string folder, string suffix)
+    {
+        var pin = new PinWindow(services.Settings.AdminPin, "Code administrateur", "Code par défaut : 1234 (à changer dans la page Système de l'admin)", standalone: true);
+        if (pin.Content is FrameworkElement content)
+        {
+            pin.Content = null;
+            RenderNatural(content, Path.Combine(folder, $"21-code-pin-au-lancement{suffix}.png"));
+        }
+        pin.Close();
+    }
+
+    private static void SnapLeave(string folder, string suffix)
+    {
+        var leave = new LeaveBoothWindow();
+        if (leave.Content is FrameworkElement content)
+        {
+            leave.Content = null;
+            RenderNatural(content, Path.Combine(folder, $"22-quitter-le-photobooth{suffix}.png"));
+        }
+        leave.Close();
+    }
+
+    private static async Task SnapChooser(Core.Events.EventStore events, string currentFolder, bool atStartup, string path)
+    {
+        var chooser = new EventChooserWindow(events, currentFolder, atStartup);
+        chooser.LoadForCapture();
+        await Task.Delay(300);
+        if (chooser.Content is FrameworkElement content)
+        {
+            chooser.Content = null;
+            Render(content, path, 1080, 720);
+        }
+        chooser.Close();
+    }
+
+    private static void SnapDialog(string message, string confirmLabel, MessageBoxImage image, bool defaultConfirm, string path)
+    {
+        var dialog = AdminDialog.CreateForCapture(message, confirmLabel, "Annuler", image, defaultConfirm);
+        if (dialog.Content is FrameworkElement content)
+        {
+            dialog.Content = null;
+            RenderNatural(content, path, minWidth: 440);
+        }
+        dialog.Close();
+    }
+
+    /// <summary>Petite fenêtre (code PIN, choix, confirmation) dessinée à sa taille naturelle, avec ses propres couleurs.</summary>
+    private static void RenderNatural(FrameworkElement content, string path, double minWidth = 0)
+    {
+        content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var size = content.DesiredSize;
+        Render(content, path, (int)Math.Ceiling(Math.Max(minWidth, size.Width)), (int)Math.Ceiling(size.Height));
     }
 
     /// <summary>Montage complet de chaque thème sur les deux modèles, avec le nom de l'événement en cours.</summary>
@@ -403,15 +540,17 @@ internal static class CaptureRunner
         note($"Écrans d'accueil : {ThemeCatalog.All.Count} thèmes et une image de fond dans {screensFolder}");
     }
 
-    private static async Task SnapEditor(AppServices services, string folder)
+    private static async Task SnapEditor(AppServices services, string folder, string suffix = "")
     {
         var template = services.Templates.Find(TemplateSeeder.BookmarkId);
         if (template == null) return;
         var editor = new TemplateEditorWindow(services, template);
         await Task.Delay(300);
-        if (editor.Content is not FrameworkElement content) return;
-        editor.Content = null;
-        Render(content, Path.Combine(folder, "16-editeur-modele.png"), 1600, 1000);
+        if (editor.Content is FrameworkElement content)
+        {
+            editor.Content = null;
+            Render(content, Path.Combine(folder, $"16-editeur-modele{suffix}.png"), 1600, 1000);
+        }
         editor.Close();
     }
 

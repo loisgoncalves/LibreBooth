@@ -1,9 +1,11 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -13,6 +15,7 @@ using LibreBooth.App.Hardware.Printing;
 using LibreBooth.App.Infrastructure;
 using LibreBooth.App.Kiosk;
 using LibreBooth.App.Services;
+using LibreBooth.Core.Admin;
 using LibreBooth.Core.Config;
 using LibreBooth.Core.Events;
 using LibreBooth.Core.Hardware;
@@ -24,16 +27,41 @@ using Serilog;
 
 namespace LibreBooth.App.Admin;
 
-/// <summary>Administration de LibreBooth (protégée par le code PIN).</summary>
+/// <summary>Les pages de l'admin, dans l'ordre du menu de gauche.</summary>
+public enum AdminPage
+{
+    Home,
+    Event,
+    Customization,
+    Camera,
+    Print,
+    Screens,
+    System,
+}
+
+/// <summary>
+/// Administration de LibreBooth (protégée par le code PIN) : un menu à gauche, une page par sujet, et en bas l'état
+/// de l'appareil, de l'imprimante et du papier, avec « Démarrer le photobooth ».
+/// </summary>
 public partial class AdminWindow : Window
 {
+    /// <summary>En dessous de cette largeur, le menu de gauche se réduit à ses icônes.</summary>
+    private const double CompactBelow = 1150;
+
+    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
+
     private readonly ILogger _log = Log.ForContext<AdminWindow>();
     private readonly AppServices _services;
     private readonly KioskViewModel _kiosk;
     private readonly DispatcherTimer _refreshTimer = new() { Interval = TimeSpan.FromSeconds(1) };
-    private readonly ObservableCollection<TemplateItem> _templates = new();
     private readonly ObservableCollection<ProfileItem> _profiles = new();
     private readonly ObservableCollection<GalleryItem> _gallery = new();
+    private readonly ObservableCollection<ReadinessRow> _readiness = new();
+    private IReadOnlyList<ReadinessItem> _readinessItems = Array.Empty<ReadinessItem>();
+    private IReadOnlyList<string> _formatNames = Array.Empty<string>();
+    private long? _freeDiskBytes;
+    private string? _diskName;
+    private bool _canonSdkMissing;
     private LiveViewDecoder? _liveDecoder;
     private bool _loading;
     private int _tick;
@@ -41,9 +69,10 @@ public partial class AdminWindow : Window
     public AdminWindow(AppServices services, KioskViewModel kiosk)
     {
         InitializeComponent();
+        AdminTheme.Attach(this);
         _services = services;
         _kiosk = kiosk;
-        HeaderVersionText.Text = $"Administration · version {App.Version}";
+        HeaderVersionText.Text = $"Version {App.Version}";
         RetakeCombo.ItemsSource = Enumerable.Range(0, ScreenSettings.MaxRetakes + 1).ToList();
 
         // Fenêtre normale (pas de plein écran), à la taille de l'écran s'il est plus petit.
@@ -52,31 +81,41 @@ public partial class AdminWindow : Window
         Height = Math.Min(Height, Math.Max(MinHeight, area.Height - 40));
 
         // Les listes sont remplies AVANT de brancher les réglages, pour que les sélections soient bien reprises.
-        TemplatesList.ItemsSource = _templates;
         ProfilesList.ItemsSource = _profiles;
         GalleryList.ItemsSource = _gallery;
+        ReadinessList.ItemsSource = _readiness;
         RotationCombo.ItemsSource = new[] { 0, 90, 180, 270 };
         var keys = new List<string> { "Space", "Enter", "B", "F5", "PageDown" };
         if (!keys.Contains(services.Settings.Screens.StartKey)) keys.Add(services.Settings.Screens.StartKey);
         StartKeyCombo.ItemsSource = keys;
         RootGrid.DataContext = services.Settings;
-        CustomizationTab.Initialize(services);
+        CustomizationView.Initialize(services);
+        CustomizationView.TemplatesChanged += (_, _) => LoadProfiles();
+
+        CameraChip.ToolTip = "Ouvrir la page Appareil photo";
+        PrinterChip.ToolTip = "Ouvrir la page Impression";
+        PaperChip.ToolTip = "Ouvrir la page Impression";
+        ShowPage(AdminPage.Home);
 
         Loaded += (_, _) =>
         {
             LoadAll();
             _refreshTimer.Start();
         };
+        SizeChanged += (_, _) => UpdateCompactMode();
         _refreshTimer.Tick += (_, _) => RefreshLiveStatus();
         Closing += OnClosing;
         services.UpdateStatusChanged += OnUpdateStatusChanged;
     }
 
-    /// <summary>« Quitter LibreBooth » (bouton, onglet Système, ou croix de la fenêtre confirmée).</summary>
+    /// <summary>« Quitter LibreBooth » (bouton du bas, ou croix de la fenêtre confirmée).</summary>
     public bool QuitRequested { get; private set; }
 
     /// <summary>« Démarrer le photobooth ».</summary>
     public bool StartRequested { get; private set; }
+
+    /// <summary>Page affichée.</summary>
+    public AdminPage CurrentPage { get; private set; } = AdminPage.Home;
 
     private bool _closeWithoutPrompt;
 
@@ -92,10 +131,9 @@ public partial class AdminWindow : Window
         // La croix de la fenêtre : l'admin est la fenêtre principale, la fermer veut dire quitter LibreBooth.
         if (!StartRequested && !QuitRequested && !_closeWithoutPrompt)
         {
-            var answer = MessageBox.Show(this,
-                "Quitter LibreBooth ?\n\nPour lancer le photobooth, cliquez plutôt sur « Démarrer le photobooth ».",
-                "LibreBooth", MessageBoxButton.YesNo, MessageBoxImage.Question);
-            if (answer != MessageBoxResult.Yes)
+            if (!AdminDialog.Ask(this,
+                    "Quitter LibreBooth ?\n\nPour lancer le photobooth, cliquez plutôt sur « Démarrer le photobooth ».",
+                    "Quitter LibreBooth", "Rester dans l'admin"))
             {
                 e.Cancel = true;
                 return;
@@ -105,47 +143,146 @@ public partial class AdminWindow : Window
         OnClosingAdmin();
     }
 
-    /// <summary>Chargement des onglets sans afficher la fenêtre (captures de vérification).</summary>
+    /// <summary>Chargement des pages sans afficher la fenêtre (captures de vérification).</summary>
     internal void LoadForCapture() => LoadAll();
 
     private void LoadAll()
     {
         LoadEventTab();
-        CustomizationTab.LoadFromEvent();
+        CustomizationView.LoadFromEvent();
         LoadCameraTab();
         LoadPrintTab();
-        LoadTemplatesTab();
-        LoadLogTab();
         LoadSystemTab();
-        RefreshLiveStatus();
+        RefreshNow();
     }
 
     private void OnClosingAdmin()
     {
         _services.UpdateStatusChanged -= OnUpdateStatusChanged;
         _updateDownload?.Cancel();
-        CustomizationTab.Flush();
+        CustomizationView.Flush();
         StopLiveTest();
         _refreshTimer.Stop();
         _services.Settings.Normalize();
         _services.SaveSettings();
     }
 
+    /// <summary>« Démarrer le photobooth » : avec moins de 2 Go libres, l'animateur est d'abord prévenu (il peut démarrer quand même).</summary>
     private void Close_Click(object sender, RoutedEventArgs e)
     {
+        if (_services.ProbePhotoDisk() is { } disk && disk.FreeBytes < DiskSpace.StartMinimumBytes)
+        {
+            _log.Warning("Démarrage du photobooth avec peu d'espace disque : {Free} libres sur {Drive}", Readiness.Size(disk.FreeBytes), disk.DriveName);
+            if (!AdminDialog.Ask(this, LowDiskMessage(disk.FreeBytes, disk.DriveName), "Démarrer quand même", "Annuler",
+                    MessageBoxImage.Warning, defaultConfirm: false))
+            {
+                _log.Information("Démarrage du photobooth annulé (espace disque)");
+                RefreshNow();
+                return;
+            }
+        }
         StartRequested = true;
         Close();
     }
 
-    private void ShowError(string message) =>
-        MessageBox.Show(this, message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
+    /// <summary>Le message d'avant le démarrage, quand le disque des photos a moins de 2 Go libres.</summary>
+    internal static string LowDiskMessage(long freeBytes, string driveName)
+    {
+        var free = Readiness.Size(freeBytes);
+        var situation = DiskSpace.AllowsSession(freeBytes)
+            ? $"Peu de place pour les photos : {free} libres sur le disque {driveName}, soit {DiskSpace.SessionsText(freeBytes)}.\n\n"
+              + "Pour un événement, gardez au moins 2 Go libres : sous 300 Mo, le photobooth met les sessions en pause."
+            : $"Plus assez de place pour les photos : {free} libres sur le disque {driveName}.\n\n"
+              + "Le photobooth ne lancera aucune session tant que vous n'aurez pas fait de la place.";
+        return situation + "\n\nPour libérer de la place : videz la corbeille de Windows, ou déplacez d'anciens événements "
+               + "(dossier Evenements des données de LibreBooth, page Système) sur une clé USB ou un disque externe.";
+    }
 
-    // ================================================================ Rafraîchissement
+    private void ShowError(string message) =>
+        AdminDialog.Show(this, message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+    // ================================================================ Menu et pages
+
+    private IEnumerable<(AdminPage Page, FrameworkElement Element)> PageElements() => new (AdminPage, FrameworkElement)[]
+    {
+        (AdminPage.Home, HomePage), (AdminPage.Event, EventPage), (AdminPage.Customization, CustomizationPage),
+        (AdminPage.Camera, CameraPage), (AdminPage.Print, PrintPage), (AdminPage.Screens, ScreensPage), (AdminPage.System, SystemPage),
+    };
+
+    /// <summary>Affiche une page et la sélectionne dans le menu.</summary>
+    internal void ShowPage(AdminPage page)
+    {
+        CurrentPage = page;
+        foreach (var (value, element) in PageElements())
+        {
+            element.Visibility = value == page ? Visibility.Visible : Visibility.Collapsed;
+        }
+        var item = NavList.Items.OfType<ListBoxItem>().First(i => Equals(i.Tag, page));
+        if (!ReferenceEquals(NavList.SelectedItem, item)) NavList.SelectedItem = item;
+    }
+
+    /// <summary>Affiche une page et fait défiler jusqu'à un élément.</summary>
+    private void ShowPage(AdminPage page, FrameworkElement target)
+    {
+        ShowPage(page);
+        Dispatcher.BeginInvoke(() => target.BringIntoView(), DispatcherPriority.Loaded);
+    }
+
+    private void NavList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (NavList.SelectedItem is ListBoxItem { Tag: AdminPage page }) ShowPage(page);
+        // Ctrl + clic désélectionne : le menu garde la page affichée.
+        else if (NavList.SelectedItem == null) ShowPage(CurrentPage);
+    }
+
+    /// <summary>Fenêtre étroite : le menu ne garde que les icônes (le nom de la page s'affiche au survol).</summary>
+    private void UpdateCompactMode()
+    {
+        var compact = ActualWidth > 0 && ActualWidth < CompactBelow;
+        if (AdminUi.GetCompact(Sidebar) == compact) return;
+        AdminUi.SetCompact(Sidebar, compact);
+        SidebarColumn.Width = new GridLength(compact ? 72 : 248);
+        BrandTexts.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        SidebarEventCard.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void ShortcutCamera_Click(object sender, RoutedEventArgs e) => ShowPage(AdminPage.Camera, TestPhotoButton);
+
+    private void ShortcutPrintTest_Click(object sender, RoutedEventArgs e) => ShowPage(AdminPage.Customization);
+
+    private void ShortcutReprint_Click(object sender, RoutedEventArgs e) => ShowPage(AdminPage.Event, GalleryList);
+
+    private void CameraChip_Click(object sender, RoutedEventArgs e) => ShowPage(AdminPage.Camera);
+
+    private void PrinterChip_Click(object sender, RoutedEventArgs e) => ShowPage(AdminPage.Print);
+
+    private void ReadinessAction_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is ReadinessRow row) ShowPage(row.Page);
+    }
+
+    // ================================================================ Rafraîchissement (chaque seconde)
+
+    /// <summary>Tout de suite, y compris ce qui n'est relu que toutes les 3 secondes (chiffres, formats, disque).</summary>
+    private void RefreshNow()
+    {
+        _tick = 0;
+        RefreshLiveStatus();
+    }
 
     private void RefreshLiveStatus()
     {
         var camera = _services.Camera;
-        CameraStatusText.Text = $"{camera.Name} — {StateLabel(camera.State)} : {camera.StatusMessage}";
+        // « Canon EOS 1300D : prêt » en vert ; le message de l'appareil seulement s'il apprend quelque chose
+        // (quand l'appareil est prêt, il ne fait que répéter « prêt »).
+        CameraStatusText.Text = $"{(camera.State == CameraState.Ready ? "✓ " : "")}{camera.Name} : {StateLabel(camera.State)}";
+        CameraStatusText.SetResourceReference(TextBlock.ForegroundProperty, camera.State switch
+        {
+            CameraState.Ready => "Admin.Success",
+            CameraState.Error => "Admin.Error",
+            _ => "Admin.Warning",
+        });
+        CameraDetailText.Text = camera.State == CameraState.Ready ? "" : camera.StatusMessage ?? "";
         BatteryText.Text = camera.BatteryLevel switch
         {
             null => "Batterie : inconnue",
@@ -154,9 +291,12 @@ public partial class AdminWindow : Window
         };
         UpdatePrinterTexts();
 
-        if (_tick++ % 3 == 0) UpdateStatsText();
-
-        FooterText.Text = $"Événement : {_services.CurrentEvent.Name} · Appareil : {StateLabel(camera.State)} · Imprimante : {_services.PrinterMonitor.Current.Message}";
+        if (_tick++ % 3 == 0)
+        {
+            UpdateStatsText();
+            RefreshSlowFacts();
+        }
+        UpdateReadiness();
     }
 
     private static string StateLabel(CameraState state) => state switch
@@ -167,26 +307,176 @@ public partial class AdminWindow : Window
         _ => "erreur",
     };
 
+    /// <summary>Formats proposés et espace disque : lus sur le disque, donc pas à chaque seconde.</summary>
+    private void RefreshSlowFacts()
+    {
+        try
+        {
+            _formatNames = _services.ActiveTemplates().Select(t => t.Name).ToList();
+        }
+        catch (Exception ex)
+        {
+            _log.Debug(ex, "Formats proposés illisibles");
+        }
+
+        var disk = _services.ProbePhotoDisk();
+        _freeDiskBytes = disk?.FreeBytes;
+        _diskName = disk?.DriveName;
+    }
+
+    private ReadinessInput BuildReadinessInput()
+    {
+        var settings = _services.Settings;
+        var camera = _services.Camera;
+        var monitor = _services.PrinterMonitor;
+        var health = monitor.Current;
+        return new ReadinessInput
+        {
+            DemoMode = _services.Options.Demo,
+            CameraKind = settings.Camera.Kind,
+            CanonSdkMissing = _canonSdkMissing && settings.Camera.Kind == CameraKind.Canon,
+            CameraState = camera.State,
+            CameraName = camera.Name,
+            CameraMessage = camera.StatusMessage,
+            BatteryLevel = camera.BatteryLevel,
+            PrintEnabled = settings.Print.Enabled,
+            PrintToPdf = _services.Options.PrintToPdf,
+            PrinterName = _services.EffectivePrinterName,
+            PrinterChecked = monitor.HasChecked,
+            PrinterCanPrint = health.CanPrint,
+            PrinterCondition = health.Condition,
+            PrinterMessage = health.Message,
+            RemainingPrints = health.RemainingPrints,
+            LowMedia = health.LowMedia,
+            Formats = _formatNames,
+            EventPrints = _services.CurrentEvent.Info.Stats.Prints,
+            EventPrintLimit = settings.Print.EventPrintLimit,
+            FreeDiskBytes = _freeDiskBytes,
+            DiskName = _diskName,
+            AvailableUpdate = _services.AvailableUpdate?.Version.ToString(3),
+        };
+    }
+
+    /// <summary>Liste « Prêt pour l'événement ? » de l'accueil et pastilles du bas.</summary>
+    private void UpdateReadiness()
+    {
+        var items = Readiness.Evaluate(BuildReadinessInput());
+        UpdateChips(items);
+        if (items.SequenceEqual(_readinessItems)) return;
+
+        // Mise à jour ligne par ligne : la liste ne clignote pas, et le bouton qui a le focus le garde.
+        var sameAreas = items.Count == _readinessItems.Count && items.Select(i => i.Area).SequenceEqual(_readinessItems.Select(i => i.Area));
+        if (!sameAreas) _readiness.Clear();
+        for (var i = 0; i < items.Count; i++)
+        {
+            var row = ReadinessRow.For(items[i]);
+            if (!sameAreas) _readiness.Add(row);
+            else if (items[i] != _readinessItems[i]) _readiness[i] = row;
+        }
+        _readinessItems = items;
+
+        var overall = Readiness.Overall(items);
+        ReadinessSummaryText.Text = Readiness.Summary(items);
+        ReadinessIcon.Text = ReadinessRow.GlyphFor(overall);
+        ReadinessIcon.SetResourceReference(TextBlock.ForegroundProperty, ReadinessRow.BrushFor(overall));
+        AutomationProperties.SetName(ReadinessSummaryText, "Prêt pour l'événement ? " + ReadinessSummaryText.Text);
+    }
+
+    private void UpdateChips(IReadOnlyList<ReadinessItem> items)
+    {
+        var camera = items.FirstOrDefault(i => i.Area == ReadinessArea.Camera);
+        var printer = items.FirstOrDefault(i => i.Area == ReadinessArea.Printer);
+        var paper = items.FirstOrDefault(i => i.Area == ReadinessArea.Paper);
+        SetChip(CameraChip, CameraChipDot, CameraChipText, camera?.Level ?? ReadinessLevel.Info, CameraChipLabel());
+        SetChip(PrinterChip, PrinterChipDot, PrinterChipText, printer?.Level ?? ReadinessLevel.Info, PrinterChipLabel(printer));
+        PaperChip.Visibility = paper == null ? Visibility.Collapsed : Visibility.Visible;
+        if (paper != null) SetChip(PaperChip, PaperChipDot, PaperChipText, paper.Level, PaperChipLabel());
+    }
+
+    private static void SetChip(Button chip, FrameworkElement dot, TextBlock text, ReadinessLevel level, string label)
+    {
+        text.Text = label;
+        dot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, ReadinessRow.BrushFor(level));
+        AutomationProperties.SetName(chip, label);
+    }
+
+    private string CameraChipLabel()
+    {
+        if (_services.Options.Demo || _services.Settings.Camera.Kind == CameraKind.Demo) return "Appareil de démonstration";
+        if (_canonSdkMissing) return "SDK Canon manquant";
+        var camera = _services.Camera;
+        return camera.State switch
+        {
+            CameraState.Ready => camera.BatteryLevel is int battery and >= 0 ? $"Appareil prêt · {battery} %" : "Appareil prêt",
+            CameraState.Connecting => "Appareil : connexion…",
+            CameraState.Disconnected => "Appareil non connecté",
+            _ => "Appareil en erreur",
+        };
+    }
+
+    private string PrinterChipLabel(ReadinessItem? item)
+    {
+        if (!_services.Settings.Print.Enabled) return "Impression désactivée";
+        if (_services.Options.PrintToPdf) return "Impression en PDF (démo)";
+        if (string.IsNullOrWhiteSpace(_services.EffectivePrinterName)) return "Aucune imprimante";
+        if (!_services.PrinterMonitor.HasChecked) return "Imprimante : vérification…";
+        return item?.Level switch
+        {
+            ReadinessLevel.Ok => "Imprimante prête",
+            ReadinessLevel.Warning => "Imprimante à vérifier",
+            _ => "Imprimante en erreur",
+        };
+    }
+
+    private string PaperChipLabel() => _services.PrinterMonitor.Current.RemainingPrints switch
+    {
+        null => "Papier : inconnu",
+        <= 0 => "Papier épuisé",
+        1 => "Papier : 1 tirage",
+        var remaining => $"Papier : {remaining} tirages",
+    };
+
     // ================================================================ Événement
 
     private void LoadEventTab()
     {
         var ev = _services.CurrentEvent;
+        var date = Capitalize(TextUtil.FormatLongDate(ev.Date));
         EventNameText.Text = ev.Name;
         EventDateText.Text = "Date : " + TextUtil.FormatLongDate(ev.Date);
         EventFolderText.Text = $"Dossier : {ev.Folder}\nDedans : « {BoothEvent.PhotosFolderName} » (photos de l'appareil), "
                                + $"« {BoothEvent.CompositesFolderName} » (photos imprimées) et « {BoothEvent.RefusedFolderName} » (séries refaites avec « Recommencer »).";
         RenameNameBox.Text = ev.Name;
         RenameDatePicker.SelectedDate = ev.Date;
+
+        HomeEventName.Text = ev.Name;
+        HomeEventDate.Text = date;
+        SidebarEventName.Text = ev.Name;
+        SidebarEventDate.Text = date;
+        SidebarEventCard.ToolTip = $"Événement ouvert : {ev.Name}\n{date}";
+        CustomizationSubtitle.Text = $"Pour l'événement « {ev.Name} » : formats proposés, thème ou vos images, textes et modèles. "
+                                     + "Tout est enregistré au fur et à mesure.";
         UpdateStatsText();
         LoadGallery();
     }
+
+    private static string Capitalize(string text) =>
+        text.Length == 0 ? text : char.ToUpper(text[0], French) + text[1..];
 
     private void UpdateStatsText()
     {
         var stats = _services.CurrentEvent.Info.Stats;
         StatsText.Text = $"{stats.Sessions} session(s) · {stats.Photos} photo(s) · {stats.Prints} impression(s)"
                          + (stats.Retakes > 0 ? $" · {stats.Retakes} série(s) recommencée(s)" : "");
+        SetStat(HomeSessionsText, HomeSessionsLabel, stats.Sessions, "session", "sessions");
+        SetStat(HomePhotosText, HomePhotosLabel, stats.Photos, "photo", "photos");
+        SetStat(HomePrintsText, HomePrintsLabel, stats.Prints, "impression", "impressions");
+    }
+
+    private static void SetStat(TextBlock number, TextBlock label, int value, string singular, string plural)
+    {
+        number.Text = value.ToString("N0", French);
+        label.Text = value >= 2 ? plural : singular;
     }
 
     private void LoadGallery()
@@ -197,8 +487,14 @@ public partial class AdminWindow : Window
         {
             var path = Path.Combine(ev.CompositesFolder, record.Composite);
             if (!File.Exists(path)) continue;
+            var prints = record.Prints switch
+            {
+                0 => "Pas imprimée",
+                1 => "1 impression",
+                var n => $"{n} impressions",
+            };
             _gallery.Add(new GalleryItem(record, path, ImageLoader.FromFile(path, decodePixelWidth: 230),
-                $"{record.CreatedAt:HH:mm} · {record.TemplateName} · {record.Prints} impr."));
+                $"{record.CreatedAt:HH:mm} · {record.TemplateName}\n{prints}"));
         }
         GalleryStatusText.Text = _gallery.Count == 0 ? "Aucune photo pour l'instant." : $"{_gallery.Count} montage(s) affiché(s).";
     }
@@ -207,12 +503,13 @@ public partial class AdminWindow : Window
 
     private void RenameEvent_Click(object sender, RoutedEventArgs e)
     {
-        CustomizationTab.Flush();
+        CustomizationView.Flush();
         var ev = _services.CurrentEvent;
         var folderFollowed = _services.RenameCurrentEvent(RenameNameBox.Text, RenameDatePicker.SelectedDate ?? ev.Date);
         _kiosk.RefreshFromSettings();
         LoadEventTab();
-        CustomizationTab.LoadFromEvent();
+        CustomizationView.LoadFromEvent();
+        RefreshNow();
         if (!folderFollowed)
         {
             ShowError("L'événement est bien renommé, mais son dossier garde l'ancien nom : un fichier de ce dossier est sans doute "
@@ -223,13 +520,13 @@ public partial class AdminWindow : Window
     /// <summary>Même fenêtre qu'au lancement : ouvrir un autre événement ou en créer un.</summary>
     private void ChangeEvent_Click(object sender, RoutedEventArgs e)
     {
-        CustomizationTab.Flush();
+        CustomizationView.Flush();
         var chooser = new EventChooserWindow(_services.Events, _services.CurrentEvent.Folder, atStartup: false) { Owner = this };
         if (chooser.ShowDialog() != true || chooser.Chosen is not { } ev) return;
         if (!EventStore.SamePath(ev.Folder, _services.CurrentEvent.Folder)) _services.OpenEvent(ev);
         LoadEventTab();
-        CustomizationTab.LoadFromEvent();
-        LoadTemplatesTab();
+        CustomizationView.LoadFromEvent();
+        RefreshNow();
     }
 
     private void RefreshGallery_Click(object sender, RoutedEventArgs e) => LoadGallery();
@@ -273,19 +570,21 @@ public partial class AdminWindow : Window
     private void UpdateCanonSdkTexts()
     {
         var missing = NativeDrivers.CanonFiles.Where(f => NativeDrivers.Find(f) == null).ToList();
+        _canonSdkMissing = missing.Count > 0;
         if (missing.Count == 0)
         {
             var path = NativeDrivers.Find(NativeDrivers.CanonFiles[0])!;
             var version = FileVersionInfo.GetVersionInfo(path).FileVersion;
-            CanonSdkText.Text = $"✓ SDK Canon présent (EDSDK {version}) : {Path.GetDirectoryName(path)}";
-            CanonSdkText.Foreground = new SolidColorBrush(Color.FromRgb(0x1E, 0x7B, 0x34));
-            CanonSdkHelp.Text = "Pour passer à une version plus récente du SDK, téléchargez-la chez Canon puis ajoutez-la avec le bouton 2.";
+            CanonSdkText.Text = $"✓ SDK Canon présent (EDSDK {version})";
+            CanonSdkText.SetResourceReference(TextBlock.ForegroundProperty, "Admin.Success");
+            CanonSdkHelp.Text = $"Dossier : {Path.GetDirectoryName(path)}\n"
+                                + "Pour passer à une version plus récente du SDK, téléchargez-la chez Canon puis ajoutez-la avec le bouton 2.";
             ImportCanonSdkButton.Content = "2. Remplacer le SDK Canon…";
         }
         else
         {
             CanonSdkText.Text = "SDK Canon manquant : sans lui, LibreBooth ne peut pas piloter l'appareil photo.";
-            CanonSdkText.Foreground = new SolidColorBrush(Color.FromRgb(0xA4, 0x26, 0x2C));
+            CanonSdkText.SetResourceReference(TextBlock.ForegroundProperty, "Admin.Error");
             CanonSdkHelp.Text = "Il appartient à Canon et ne peut pas être fourni avec LibreBooth. 1. Ouvrez la page Canon, "
                                 + "inscrivez-vous (gratuit) et téléchargez le SDK « EDSDK » pour Windows. 2. Indiquez le fichier "
                                 + "zip téléchargé : LibreBooth en extrait lui-même les bons fichiers (version 32 bits).";
@@ -314,8 +613,8 @@ public partial class AdminWindow : Window
             _services.RestartCamera();
             UpdateCanonSdkTexts();
             RefreshLiveStatus();
-            MessageBox.Show(this, $"SDK Canon ajouté (EDSDK {version}).\n\nBranchez l'appareil photo en USB et allumez-le : "
-                                  + "LibreBooth s'y connecte tout seul.", "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Information);
+            AdminDialog.Show(this, $"SDK Canon ajouté (EDSDK {version}).\n\nBranchez l'appareil photo en USB et allumez-le : "
+                                   + "LibreBooth s'y connecte tout seul.", "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
@@ -338,7 +637,9 @@ public partial class AdminWindow : Window
         catch (Exception ex)
         {
             Log.Warning(ex, "Page impossible à ouvrir : {Url}", url);
-            MessageBox.Show($"Ouvrez cette adresse dans votre navigateur :\n{url}", "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Information);
+            var owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(w => w.IsActive);
+            AdminDialog.Show(owner, $"Ouvrez cette adresse dans votre navigateur :\n{url}", "LibreBooth",
+                MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 
@@ -364,6 +665,7 @@ public partial class AdminWindow : Window
             _liveDecoder.Attach();
             await _services.Camera.StartLiveViewAsync();
             LiveTestButton.Content = "Arrêter le live view";
+            AdminUi.SetGlyph(LiveTestButton, "\uE71A");
             CameraTestStatus.Text = "Live view en cours.";
         }
         catch (Exception ex)
@@ -379,6 +681,7 @@ public partial class AdminWindow : Window
         _liveDecoder.Dispose();
         _liveDecoder = null;
         LiveTestButton.Content = "Démarrer le live view";
+        AdminUi.SetGlyph(LiveTestButton, "\uE768");
         _ = StopLiveViewSafelyAsync();
     }
 
@@ -428,6 +731,7 @@ public partial class AdminWindow : Window
         PrinterModeHelp.Text = _services.Options.PrintToPdf
             ? "Mode démo : les impressions sont enregistrées en PDF dans le dossier « impressions-demo » de l'événement."
             : "";
+        PrinterModeHelp.Visibility = PrinterModeHelp.Text.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
         UpdatePrinterTexts();
     }
 
@@ -611,9 +915,20 @@ public partial class AdminWindow : Window
 
     private void UpdatePrinterTexts()
     {
-        var health = _services.PrinterMonitor.Current;
-        PrinterStateText.Text = (health.CanPrint ? "✓ " : "⚠ ") + health.Message;
-        PrinterStateText.Foreground = health.CanPrint ? Brushes.DarkGreen : Brushes.DarkRed;
+        var monitor = _services.PrinterMonitor;
+        var health = monitor.Current;
+        string brush;
+        if (!monitor.HasChecked)
+        {
+            PrinterStateText.Text = health.Message;
+            brush = "Admin.TextMuted";
+        }
+        else
+        {
+            PrinterStateText.Text = (health.CanPrint ? "✓ " : "⚠ ") + health.Message;
+            brush = health.CanPrint ? "Admin.Success" : _services.Settings.Print.Enabled ? "Admin.Error" : "Admin.TextMuted";
+        }
+        PrinterStateText.SetResourceReference(TextBlock.ForegroundProperty, brush);
         RemainingText.Text = health.RemainingPrints is int remaining
             ? $"Tirages restants : {remaining}" + (health.LowMedia ? " — bientôt terminé !" : "")
             : "Tirages restants : inconnu";
@@ -621,92 +936,7 @@ public partial class AdminWindow : Window
         MediaCounterText.Text = $"Impressions depuis le dernier changement de rouleau : {_services.Settings.Print.PrintedSinceMediaChange}";
     }
 
-    // ================================================================ Modèles
-
-    private void LoadTemplatesTab()
-    {
-        _templates.Clear();
-        var context = _services.CurrentPreviewContext();
-        foreach (var template in _services.Templates.LoadAll())
-        {
-            ImageSource? preview = null;
-            try
-            {
-                preview = ImageLoader.FromFile(TemplatePreview.GetOrCreate(_services.Compositor, template, context), decodePixelHeight: 280);
-            }
-            catch (Exception ex)
-            {
-                _log.Warning(ex, "Aperçu du modèle {Template}", template.Id);
-            }
-
-            var offered = _services.Customization.Templates.Contains(template.Id, StringComparer.OrdinalIgnoreCase);
-            _templates.Add(new TemplateItem(template, preview, offered));
-        }
-    }
-
-    /// <summary>Après un changement dans la liste des modèles : l'onglet Personnalisation suit.</summary>
-    private void AfterTemplatesChanged()
-    {
-        _services.EnsureActiveTemplates();
-        LoadTemplatesTab();
-        LoadProfiles();
-        CustomizationTab.LoadFromEvent();
-    }
-
-    private TemplateItem? SelectedTemplate()
-    {
-        if (TemplatesList.SelectedItem is TemplateItem item) return item;
-        ShowError("Choisissez d'abord un modèle dans la liste.");
-        return null;
-    }
-
-    private void ImportTemplate_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new OpenFileDialog { Title = "Choisir un cadre PNG", Filter = "Images PNG (*.png)|*.png" };
-        if (dialog.ShowDialog(this) != true) return;
-        try
-        {
-            var template = _services.Templates.ImportFrame(dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName));
-            var message = template.ShotCount == 0
-                ? "Aucune zone transparente trouvée : ajoutez les zones photo à la main."
-                : $"{template.ShotCount} zone(s) photo détectée(s) automatiquement : vérifiez-les puis enregistrez.";
-            new TemplateEditorWindow(_services, template, message) { Owner = this }.ShowDialog();
-            AfterTemplatesChanged();
-        }
-        catch (Exception ex)
-        {
-            _log.Error(ex, "Import du cadre impossible");
-            ShowError("Import du cadre impossible : " + ex.Message);
-        }
-    }
-
-    private void EditTemplate_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedTemplate() is not { } item) return;
-        new TemplateEditorWindow(_services, item.Template) { Owner = this }.ShowDialog();
-        AfterTemplatesChanged();
-    }
-
-    private void DuplicateTemplate_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedTemplate() is not { } item) return;
-        _services.Templates.Duplicate(item.Template);
-        AfterTemplatesChanged();
-    }
-
-    private void DeleteTemplate_Click(object sender, RoutedEventArgs e)
-    {
-        if (SelectedTemplate() is not { } item) return;
-        var answer = MessageBox.Show(this, $"Supprimer le modèle « {item.Name} » ?\nIl sera déplacé dans le dossier Modeles\\_corbeille.",
-            "LibreBooth", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
-        _services.Templates.Delete(item.Template);
-        AfterTemplatesChanged();
-    }
-
-    private void OpenTemplatesFolder_Click(object sender, RoutedEventArgs e) => Shell.OpenFolder(_services.Templates.Root);
-
-    // ================================================================ Journal et système
+    // ================================================================ Système
 
     private void LoadLogTab()
     {
@@ -714,16 +944,34 @@ public partial class AdminWindow : Window
         LogText.ScrollToEnd();
     }
 
+    /// <summary>Le journal n'est lu qu'à l'ouverture de sa section.</summary>
+    private void LogExpander_Expanded(object sender, RoutedEventArgs e) => LoadLogTab();
+
     private void RefreshLog_Click(object sender, RoutedEventArgs e) => LoadLogTab();
 
     private void OpenLogFolder_Click(object sender, RoutedEventArgs e) => Shell.OpenFolder(_services.Paths.LogsFolder);
 
     private void LoadSystemTab()
     {
+        _loading = true;
+        AppearanceLightRadio.IsChecked = _services.Settings.AdminAppearance == AdminAppearance.Light;
+        AppearanceDarkRadio.IsChecked = _services.Settings.AdminAppearance == AdminAppearance.Dark;
+        _loading = false;
         VersionText.Text = $"LibreBooth {App.Version}";
         ModeText.Text = _services.Options.Demo ? "Mode démo (lancé avec --demo)" : "Mode normal";
         DataFolderText.Text = "Données : " + _services.Paths.DataRoot;
         ShowUpdateStatus();
+    }
+
+    /// <summary>Clair ou sombre : toutes les fenêtres de l'admin changent tout de suite, barre de titre comprise.</summary>
+    private void Appearance_Checked(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        var appearance = AppearanceDarkRadio.IsChecked == true ? AdminAppearance.Dark : AdminAppearance.Light;
+        if (_services.Settings.AdminAppearance == appearance && AdminTheme.Current == appearance) return;
+        _services.Settings.AdminAppearance = appearance;
+        _services.SaveSettings();
+        AdminTheme.Apply(appearance);
     }
 
     // ================================================================ Mises à jour
@@ -732,7 +980,7 @@ public partial class AdminWindow : Window
 
     private void OnUpdateStatusChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(ShowUpdateStatus);
 
-    /// <summary>Bandeau en haut de l'admin et partie « Mises à jour » de l'onglet Système.</summary>
+    /// <summary>Bandeau en haut de l'admin et partie « Mises à jour » de la page Système.</summary>
     private void ShowUpdateStatus()
     {
         var update = _services.AvailableUpdate;
@@ -781,11 +1029,7 @@ public partial class AdminWindow : Window
 
     private static string SizeText(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / (1024.0 * 1024):0} Mo" : $"{Math.Max(1, bytes / 1024)} Ko";
 
-    private void ShowUpdate_Click(object sender, RoutedEventArgs e)
-    {
-        AdminTabs.SelectedItem = SystemTab;
-        Dispatcher.BeginInvoke(() => UpdatesGroup.BringIntoView(), DispatcherPriority.Loaded);
-    }
+    private void ShowUpdate_Click(object sender, RoutedEventArgs e) => ShowPage(AdminPage.System, UpdatesGroup);
 
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e) => await _services.CheckForUpdatesAsync();
 
@@ -799,15 +1043,17 @@ public partial class AdminWindow : Window
     {
         if (_services.AvailableUpdate is not { } update || _updateDownload != null) return;
         var version = update.Version.ToString(3);
-        var answer = MessageBox.Show(this,
-            $"Installer LibreBooth {version} ?\n\n"
-            + $"LibreBooth va télécharger la mise à jour ({SizeText(update.Installer.Size)}) et contrôler son empreinte, puis se fermer pour l'installer. "
-            + "Windows va demander l'autorisation d'installer.\n\n"
-            + "Vos photos, événements, réglages et pilotes sont gardés. À la fin, LibreBooth peut se rouvrir tout seul.",
-            "LibreBooth", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!AdminDialog.Ask(this,
+                $"Installer LibreBooth {version} ?\n\n"
+                + $"LibreBooth va télécharger la mise à jour ({SizeText(update.Installer.Size)}) et contrôler son empreinte, puis se fermer pour l'installer. "
+                + "Windows va demander l'autorisation d'installer.\n\n"
+                + "Vos photos, événements, réglages et pilotes sont gardés. À la fin, LibreBooth peut se rouvrir tout seul.",
+                "Installer", "Plus tard"))
+        {
+            return;
+        }
 
-        CustomizationTab.Flush();
+        CustomizationView.Flush();
         _services.Settings.Normalize();
         _services.SaveSettings();
         _updateDownload = new CancellationTokenSource();
@@ -876,7 +1122,7 @@ public partial class AdminWindow : Window
     /// <summary>Vérification de l'installation, avec l'état de l'appareil et de l'imprimante vu par LibreBooth.</summary>
     private void Verify_Click(object sender, RoutedEventArgs e)
     {
-        CustomizationTab.Flush();
+        CustomizationView.Flush();
         _services.SaveSettings();
         new LibreBooth.App.Diagnostics.VerificationWindow(_services, _services.Paths) { Owner = this }.ShowDialog();
     }
@@ -903,31 +1149,53 @@ public partial class AdminWindow : Window
 
     private void Quit_Click(object sender, RoutedEventArgs e)
     {
-        var answer = MessageBox.Show(this, "Quitter LibreBooth ?", "LibreBooth", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!AdminDialog.Ask(this, "Quitter LibreBooth ?\n\nLe photobooth s'arrête : l'appareil photo et l'imprimante sont libérés.",
+                "Quitter LibreBooth"))
+        {
+            return;
+        }
         QuitRequested = true;
         Close();
     }
 }
 
-public sealed class TemplateItem
+/// <summary>Une ligne de « Prêt pour l'événement ? » : le point vérifié, et la page qui permet de le régler.</summary>
+public sealed record ReadinessRow(ReadinessItem Item, AdminPage Page, string PageLabel)
 {
-    public TemplateItem(Template template, ImageSource? preview, bool offered)
-    {
-        Template = template;
-        Preview = preview;
-        var layout = template.Layout;
-        Details = $"{template.ShotCount} photo(s) · {layout.OutputWidth} × {layout.OutputHeight} px · profil d'impression « {layout.PrintProfile} »"
-                  + (layout.IsCustomizable ? " · personnalisable" : " · cadre PNG")
-                  + (layout.DuplicateStrip ? " · imprimé deux fois puis coupé" : "")
-                  + (layout.BlackAndWhite ? " · noir et blanc" : "")
-                  + (offered ? " · proposé pour cet événement" : "");
-    }
+    public ReadinessLevel Level => Item.Level;
+    public string Title => Item.Title;
+    public string Detail => Item.Detail;
+    public string Glyph => GlyphFor(Item.Level);
 
-    public Template Template { get; }
-    public ImageSource? Preview { get; }
-    public string Name => Template.Name;
-    public string Details { get; }
+    /// <summary>Bouton vers la page, seulement si le point n'est pas au vert (null : pas de bouton).</summary>
+    public string? PageName => Item.Level == ReadinessLevel.Ok ? null : PageLabel;
+
+    public string ActionName => $"{Item.Title} : ouvrir la page {PageLabel}";
+
+    public static ReadinessRow For(ReadinessItem item) => item.Area switch
+    {
+        ReadinessArea.Camera => new(item, AdminPage.Camera, "Appareil photo"),
+        ReadinessArea.Printer or ReadinessArea.Paper or ReadinessArea.PrintLimit => new(item, AdminPage.Print, "Impression"),
+        ReadinessArea.Formats => new(item, AdminPage.Customization, "Personnalisation"),
+        _ => new(item, AdminPage.System, "Système"),
+    };
+
+    public static string GlyphFor(ReadinessLevel level) => level switch
+    {
+        ReadinessLevel.Ok => "\uE930",
+        ReadinessLevel.Info => "\uE946",
+        ReadinessLevel.Warning => "\uE7BA",
+        _ => "\uE783",
+    };
+
+    /// <summary>Clé du pinceau de l'admin (clair ou sombre) pour cette gravité.</summary>
+    public static string BrushFor(ReadinessLevel level) => level switch
+    {
+        ReadinessLevel.Ok => "Admin.Success",
+        ReadinessLevel.Info => "Admin.Info",
+        ReadinessLevel.Warning => "Admin.Warning",
+        _ => "Admin.Error",
+    };
 }
 
 public sealed class ProfileItem : INotifyPropertyChanged
@@ -958,4 +1226,8 @@ public sealed class ProfileItem : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-public sealed record GalleryItem(SessionRecord Record, string CompositePath, ImageSource? Thumbnail, string Label);
+public sealed record GalleryItem(SessionRecord Record, string CompositePath, ImageSource? Thumbnail, string Label)
+{
+    /// <summary>Ce que lit un lecteur d'écran pour la ligne de la galerie : l'heure, le format et les impressions.</summary>
+    public override string ToString() => Label.Replace("\n", " · ");
+}

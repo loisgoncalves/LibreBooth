@@ -43,6 +43,8 @@ public partial class App : Application
         Log.Information("Démarrage de LibreBooth {Version} (démo : {Demo}, données : {Data})", Version, options.Demo, paths.DataRoot);
         RegisterGlobalErrorHandlers();
         WheelScrolling.Register();
+        // Admin en clair ou en sombre (admin › Système › Apparence), avant la première fenêtre (code PIN, vérification…).
+        AdminTheme.Apply(AdminTheme.ReadSetting(paths.ConfigFile));
 
         if (options.IsDiagnosticRun)
         {
@@ -102,6 +104,7 @@ public partial class App : Application
         try
         {
             Services = AppServices.Create(paths, options, Dispatcher);
+            AdminTheme.Apply(Services.Settings.AdminAppearance);
             Theme.Apply(this, Services.CurrentKioskPalette());
             var kiosk = new KioskViewModel(Services);
             Services.Kiosk = kiosk;

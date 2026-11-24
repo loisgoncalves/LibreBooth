@@ -14,7 +14,7 @@
       .\installer\nouvelle-version.ps1 -Type correctif|fonction|majeure
   -->
   <PropertyGroup>
-    <Version>2.0.0</Version>
+    <Version>3.0.0</Version>
   </PropertyGroup>
 
 </Project>

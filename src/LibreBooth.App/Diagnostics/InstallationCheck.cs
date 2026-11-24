@@ -3,6 +3,7 @@ using LibreBooth.App.Hardware;
 using LibreBooth.App.Hardware.Canon;
 using LibreBooth.App.Hardware.Printing;
 using LibreBooth.App.Services;
+using LibreBooth.Core.Admin;
 using LibreBooth.Core.Config;
 using LibreBooth.Core.Design;
 using LibreBooth.Core.Hardware;
@@ -212,17 +213,23 @@ public static class InstallationCheck
             report(new CheckResult(DataCategory, "Modèles", CheckStatus.Warning, "Lecture impossible : " + ex.Message));
         }
 
-        try
+        // Mêmes seuils que l'admin et le photobooth : 2 Go conseillés, plus de session sous 300 Mo.
+        if (DiskSpace.Probe(root) is { } disk)
         {
-            var drive = new DriveInfo(Path.GetPathRoot(root)!);
-            var freeGb = drive.AvailableFreeSpace / 1024d / 1024d / 1024d;
-            var status = freeGb < 0.3 ? CheckStatus.Error : freeGb < 2 ? CheckStatus.Warning : CheckStatus.Ok;
-            report(new CheckResult(DataCategory, "Espace disque", status, $"{freeGb:0.0} Go libres sur {drive.Name}",
-                status == CheckStatus.Ok ? null : "Libérez de la place : chaque photo prend 3 à 8 Mo."));
+            var free = disk.FreeBytes;
+            var status = !DiskSpace.AllowsSession(free) ? CheckStatus.Error
+                : free < DiskSpace.StartMinimumBytes ? CheckStatus.Warning
+                : CheckStatus.Ok;
+            report(status == CheckStatus.Ok
+                ? new CheckResult(DataCategory, "Espace disque", status, $"{Readiness.Size(free)} libres sur {disk.DriveName}")
+                : new CheckResult(DataCategory, "Espace disque", status,
+                    $"{Readiness.Size(free)} libres sur {disk.DriveName}, soit {DiskSpace.SessionsText(free)}",
+                    "Gardez au moins 2 Go libres pour un événement : sous 300 Mo, le photobooth ne lance plus de session. "
+                    + "Videz la corbeille, ou déplacez d'anciens événements sur une clé USB ou un disque externe."));
         }
-        catch (Exception ex)
+        else
         {
-            report(new CheckResult(DataCategory, "Espace disque", CheckStatus.Info, ex.Message));
+            report(new CheckResult(DataCategory, "Espace disque", CheckStatus.Info, "Place libre inconnue (dossier réseau ou disque illisible)."));
         }
         return settings;
     }

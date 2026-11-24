@@ -7,47 +7,74 @@
         SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
-        Topmost="True"
-        Background="#1E2028"
-        Foreground="White"
-        FontFamily="Segoe UI">
-    <Window.Resources>
-        <Style x:Key="PinKey" TargetType="Button">
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Background" Value="#2E323D" />
-            <Setter Property="FontSize" Value="34" />
-            <Setter Property="Height" Value="86" />
-            <Setter Property="Margin" Value="6" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="14">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FFC83D" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
-    <Border Padding="36" BorderBrush="#FFC83D" BorderThickness="2">
-        <StackPanel Width="400">
+        Topmost="True">
+    <!-- Aux couleurs de l'admin, en clair ou en sombre. Styles sur la bordure (et pas sur la fenêtre) : les captures les gardent. -->
+    <Border Background="{DynamicResource Admin.Window}" BorderBrush="{DynamicResource Admin.Accent}" BorderThickness="2" Padding="36,30"
+            TextElement.Foreground="{DynamicResource Admin.Text}" TextElement.FontFamily="Segoe UI" TextElement.FontSize="16">
+        <Border.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/LibreBooth;component/Resources/AdminStyles.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+
+                <!-- Touche du pavé : grande, pour le doigt ; s'assombrit (ou s'éclaircit en sombre) quand on appuie -->
+                <Style x:Key="PinKey" TargetType="Button">
+                    <Setter Property="Focusable" Value="False" />
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="Foreground" Value="{DynamicResource Admin.Text}" />
+                    <Setter Property="Background" Value="{DynamicResource Admin.Control}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource Admin.ControlBorder}" />
+                    <Setter Property="FontSize" Value="32" />
+                    <Setter Property="Height" Value="80" />
+                    <Setter Property="Margin" Value="6" />
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Button">
+                                <Grid SnapsToDevicePixels="True">
+                                    <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                                            CornerRadius="12">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <Border x:Name="Press" Background="{DynamicResource Admin.Text}" CornerRadius="12" Opacity="0" IsHitTestVisible="False" />
+                                </Grid>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="Press" Property="Opacity" Value="0.06" />
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="Press" Property="Opacity" Value="0.18" />
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+                <!-- Touche OK, à la couleur d'accent -->
+                <Style x:Key="PinOkKey" TargetType="Button" BasedOn="{StaticResource PinKey}">
+                    <Setter Property="Foreground" Value="{DynamicResource Admin.OnAccent}" />
+                    <Setter Property="Background" Value="{DynamicResource Admin.Accent}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource Admin.Accent}" />
+                    <Setter Property="FontSize" Value="26" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                </Style>
+            </ResourceDictionary>
+        </Border.Resources>
+
+        <StackPanel Width="380">
             <!-- Au lancement de LibreBooth : le logo au-dessus du code -->
-            <StackPanel x:Name="BrandPanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,18" Visibility="Collapsed">
-                <Image Source="pack://application:,,,/Resources/icone-librebooth.png" Height="56" RenderOptions.BitmapScalingMode="HighQuality" />
-                <TextBlock Text="LibreBooth" FontSize="32" FontWeight="Bold" VerticalAlignment="Center" Margin="12,0,0,0" />
+            <StackPanel x:Name="BrandPanel" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,16" Visibility="Collapsed">
+                <Image Source="pack://application:,,,/Resources/icone-librebooth.png" Width="52" Height="52" RenderOptions.BitmapScalingMode="HighQuality" />
+                <TextBlock Text="LibreBooth" FontSize="30" FontWeight="Bold" VerticalAlignment="Center" Margin="12,0,0,0" />
             </StackPanel>
-            <TextBlock x:Name="TitleText" Text="Code administrateur" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" />
-            <TextBlock x:Name="HintText" FontSize="16" Foreground="#B8BCC8" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center" Margin="0,8,0,0" Visibility="Collapsed" />
-            <TextBlock x:Name="DotsText" FontSize="46" HorizontalAlignment="Center" Margin="0,18,0,0" MinHeight="64" />
-            <TextBlock x:Name="ErrorText" Foreground="#FF7A7A" FontSize="18" HorizontalAlignment="Center" MinHeight="26" />
-            <UniformGrid x:Name="Keypad" Columns="3" Margin="0,10,0,0" />
-            <Button Style="{StaticResource PinKey}" Content="Annuler" FontSize="24" Height="64" Margin="6,16,6,0" Click="Cancel_Click" />
+            <TextBlock x:Name="TitleText" Text="Code administrateur" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center"
+                       TextWrapping="Wrap" TextAlignment="Center" />
+            <TextBlock x:Name="HintText" Style="{StaticResource Help}" FontSize="15" HorizontalAlignment="Center" TextAlignment="Center"
+                       Margin="0,6,0,0" Visibility="Collapsed" />
+            <TextBlock x:Name="DotsText" FontSize="44" HorizontalAlignment="Center" Margin="0,14,0,0" MinHeight="62" AutomationProperties.Name="Code tapé" />
+            <TextBlock x:Name="ErrorText" Foreground="{DynamicResource Admin.Error}" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"
+                       MinHeight="26" />
+            <UniformGrid x:Name="Keypad" Columns="3" Margin="0,8,0,0" />
+            <Button Content="Annuler" FontSize="20" MinHeight="58" Margin="6,16,6,0" Focusable="False" Click="Cancel_Click" />
         </StackPanel>
     </Border>
 </Window>

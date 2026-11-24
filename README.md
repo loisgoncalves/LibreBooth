@@ -32,14 +32,22 @@ propres impressions, ses propres écrans et son propre dossier de photos.
 - **Impression** sur la DNP : l'invité choisit ses exemplaires (jusqu'au maximum fixé pour l'événement).
 - **Recommencer** : l'invité refait sa série tant qu'il n'a rien imprimé ; la série refusée est gardée à part.
 - **Admin d'abord** : au lancement, le code PIN, le choix de l'événement, puis l'administration dans une fenêtre
-  normale ; le photobooth plein écran démarre avec « Démarrer le photobooth ». Un bouton rond sur l'accueil permet,
-  avec le code PIN, de revenir à l'admin ou de quitter.
+  normale, en clair ou en sombre. Sa page d'accueil, **« Prêt pour l'événement ? »**, dit d'un coup d'œil ce qui reste
+  à vérifier (appareil photo, imprimante, papier, formats, espace disque). Le photobooth plein écran démarre avec
+  « Démarrer le photobooth » ; un bouton rond sur son accueil permet, avec le code PIN, de revenir à l'admin ou de
+  quitter.
 - **Vérification de l'installation** : dossiers, fichiers, pilotes, imprimante et appareil photo, avec ce qu'il faut
   faire en cas de problème.
 - **Mises à jour** : quand le PC est connecté à Internet, LibreBooth signale les nouvelles versions et les installe
   depuis l'admin, jamais pendant le photobooth.
 - **Fiabilité** : chaque photo est écrite sur le disque dès son arrivée, l'appareil se reconnecte tout seul, une
-  erreur affiche un message clair puis le photobooth repart, la mise en veille de Windows est bloquée.
+  erreur affiche un message clair puis le photobooth repart, la mise en veille de Windows est bloquée. L'espace
+  disque est surveillé : le photobooth se met en pause avant que le disque soit plein.
+
+<p align="center">
+  <img src="docs/images/admin-accueil.png" alt="Admin : accueil « Prêt pour l'événement ? »" width="45%">
+  <img src="docs/images/admin-accueil-sombre.png" alt="Admin en sombre" width="45%">
+</p>
 
 <p align="center">
   <img src="docs/images/admin-personnalisation-theme.png" alt="Personnalisation : thème" width="45%">
@@ -88,17 +96,20 @@ est souvent synchronisé par OneDrive.
 
 ## Premier lancement
 
-1. Lancez **LibreBooth** : le code PIN est demandé (**1234** par défaut : changez-le tout de suite, onglet
+1. Lancez **LibreBooth** : le code PIN est demandé (**1234** par défaut : changez-le tout de suite, page
    Système).
 2. **Choisissez l'événement** : ouvrez un événement existant, ou créez-en un avec son **nom** (il peut apparaître
    sur les photos), sa **date** et sa personnalisation de départ : le thème de LibreBooth, ou celle d'un autre
    événement pour ne pas tout refaire.
-3. L'administration s'ouvre dans une fenêtre normale. Réglez l'événement :
-   - **Personnalisation** : formats proposés, exemplaires, et le mode « Thème LibreBooth » ou « Mes propres images » ;
+3. L'administration s'ouvre dans une fenêtre normale, sur sa page **Accueil**. Réglez l'événement avec le menu à
+   gauche :
+   - **Personnalisation** : formats proposés, exemplaires, le mode « Thème LibreBooth » ou « Mes propres images »,
+     et en bas les modèles ;
    - **Impression** : vérifiez que l'imprimante DNP est choisie (c'est automatique) ;
    - **Écrans** : textes, compte à rebours, délais, bouton « Recommencer » ;
-   - **Système** : code PIN, lancement au démarrage de Windows, mises à jour.
-4. Cliquez sur **« Démarrer le photobooth »**.
+   - **Système** : code PIN, apparence claire ou sombre, lancement au démarrage de Windows, mises à jour.
+4. Revenez à l'**Accueil** : « Prêt pour l'événement ? » liste ce qui reste à vérifier, avec un bouton vers la bonne
+   page. Puis cliquez sur **« Démarrer le photobooth »**.
 5. Pendant l'événement, pour revenir à l'admin ou quitter : **bouton rond en bas à droite** de l'accueil, puis le code
    PIN. L'appui de 3 secondes dans le coin en haut à droite (ou `Ctrl+Maj+A`) mène aussi à l'admin.
 
@@ -115,7 +126,7 @@ Tout se règle **pour chaque événement**, dans l'admin › **Personnalisation*
 | **10x15 – une photo** | 10x15 paysage (1800 × 1200 px) : une grande photo, textes et logo en bas | 1 |
 | **Marque-page – 3 photos** | marque-page 5x15 (600 × 1800 px), imprimé deux fois sur un 10x15 que la DNP coupe au milieu : chaque exemplaire donne **2 marque-pages** | 3 |
 
-En haut de l'onglet, choisissez le **mode** :
+En haut de la page, choisissez le **mode** :
 
 - **Thème LibreBooth** : un thème prêt à l'emploi, à retoucher si besoin.
 
@@ -138,8 +149,8 @@ Textes : `{evenement}` est remplacé par le nom de l'événement, `{date}` par 2
 22 novembre 2026. **Imprimer un essai** imprime le format affiché, avec des photos d'exemple.
 
 Les écrans du photobooth (accueil, choix du format, photo, fin) prennent les couleurs et la police du titre des
-impressions. Pour un cadre complet fait ailleurs, admin › **Modèles** › **Importer un cadre PNG…** (zones
-transparentes à l'emplacement des photos, 1800 × 1200 px pour un 10x15).
+impressions. Pour un cadre complet fait ailleurs, admin › Personnalisation › **Modèles et cadres PNG** ›
+**Importer un cadre PNG…** (zones transparentes à l'emplacement des photos, 1800 × 1200 px pour un 10x15).
 
 ## Réglages conseillés
 
@@ -164,21 +175,27 @@ lui-même. Si vous réglez un format à la main (« Réglages du pilote… »), 
 
 ## Au quotidien
 
-- **Changer d'événement** : au lancement de LibreBooth, ou admin › Événement › « Changer d'événement… ». Le même
-  onglet renomme l'événement (son dossier suit) et ouvre son dossier de photos.
+- **Changer d'événement** : au lancement de LibreBooth, ou admin › Événement › « Changer d'événement… ». La même
+  page renomme l'événement (son dossier suit) et ouvre son dossier de photos.
 - **Dossier de l'événement** : `C:\Users\<nom>\LibreBooth\Evenements\2026-11-23 Mariage Julie et Tom\`, avec
   `Photos` (photos de l'appareil), `Montages` (photos imprimées) et `Photos refusées` (séries recommencées). Ce dont
   LibreBooth a besoin pour l'événement (personnalisation, fiches des sessions) est rangé à part, dans le dossier
   caché `.librebooth`. Les événements des versions 1.x sont convertis au premier lancement de la 2.0.0, sans perdre
   une photo.
 - **Réimprimer** une photo : admin › Événement › Galerie.
+- **Espace disque** : gardez au moins **2 Go** libres sur le disque des photos (environ 170 sessions). En dessous,
+  « Démarrer le photobooth » prévient, et l'on peut démarrer quand même. Sous **300 Mo**, le photobooth ne lance plus
+  de session : son accueil affiche « Le photobooth fait une pause » et prévient l'animateur. Videz la corbeille de
+  Windows, ou déplacez d'anciens événements (dossier `Evenements`) sur une clé USB ou un disque externe : les sessions
+  reprennent toutes seules en quelques secondes.
+- **Mode sombre** : admin › Système › Apparence.
 - **Mettre à jour** : quand une nouvelle version est publiée, un bandeau l'annonce dans l'admin. Admin › Système ›
   Mises à jour › **« Installer la mise à jour »** : LibreBooth la télécharge depuis GitHub, contrôle son empreinte
   SHA-256, puis se ferme. Windows demande l'autorisation, la nouvelle version s'installe, et « Terminer » relance
   LibreBooth. Photos, événements, réglages et pilotes sont gardés. Une copie décompressée depuis le zip (sans le
   programme d'installation) ne se met pas à jour seule : l'admin donne le lien de la nouvelle version.
 - **Quitter** : bouton « Quitter LibreBooth » en bas de l'admin, ou bouton rond de l'accueil du photobooth (code PIN).
-- **Journal** : admin › Journal, ou `C:\Users\<nom>\LibreBooth\logs`.
+- **Journal** : admin › Système › Journal (dépannage), ou `C:\Users\<nom>\LibreBooth\logs`.
 - **Diagnostic complet du matériel** (live view, photo de test), LibreBooth fermé :
 
   ```powershell
@@ -210,7 +227,8 @@ l'imprimante DNP reste installé.
 | Aucune imprimante DNP | Relancez le programme d'installation avec la case du pilote cochée (ou installez-le depuis le site de DNP), puis branchez la DNP en USB et allumez-la. |
 | Marque-pages non coupés | Admin › Impression › « Réglages automatiques DNP », puis une page de test. |
 | « GitHub n'a pas pu être joint » (mises à jour) | Pas d'Internet, ou réseau qui bloque GitHub. LibreBooth fonctionne sans ; une fois connecté : admin › Système › « Rechercher maintenant ». |
-| Autre chose | Menu Démarrer › LibreBooth › « Vérifier l'installation de LibreBooth », puis le journal (admin › Journal). |
+| « Disque presque plein : sessions en pause » | Videz la corbeille de Windows, ou déplacez d'anciens événements (dossier `Evenements`) sur une clé USB : le photobooth reprend tout seul. |
+| Autre chose | Menu Démarrer › LibreBooth › « Vérifier l'installation de LibreBooth », puis le journal (admin › Système › Journal). |
 
 ## Données et vie privée
 

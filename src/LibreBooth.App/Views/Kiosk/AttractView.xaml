@@ -79,11 +79,11 @@
             </Grid>
         </Button>
 
-        <!-- Appareil pas encore prêt -->
+        <!-- Appareil pas encore prêt, ou pause (disque presque plein) -->
         <Border Background="{DynamicResource OverlayBrush}" Visibility="{Binding IsReady, Converter={StaticResource InverseBoolToVisibility}}">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <Control Style="{StaticResource Spinner}" />
-                <TextBlock Text="Le photobooth se prépare…" FontSize="64" FontWeight="SemiBold" Margin="0,48,0,0" HorizontalAlignment="Center" />
+                <TextBlock Text="{Binding NotReadyTitle}" FontSize="64" FontWeight="SemiBold" Margin="0,48,0,0" HorizontalAlignment="Center" />
                 <TextBlock Text="{Binding NotReadyMessage}" FontSize="32" Foreground="{DynamicResource MutedTextBrush}"
                            TextWrapping="Wrap" TextAlignment="Center" MaxWidth="1400" Margin="0,24,0,0" HorizontalAlignment="Center" />
             </StackPanel>

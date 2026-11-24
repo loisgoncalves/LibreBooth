@@ -21,8 +21,8 @@ using Serilog;
 namespace LibreBooth.App.Admin;
 
 /// <summary>
-/// Onglet « Personnalisation » : formats proposés, nombre d'exemplaires et apparence des modèles pour
-/// l'événement en cours, avec un aperçu en direct. Chaque modification est enregistrée automatiquement.
+/// Page « Personnalisation » : formats proposés, nombre d'exemplaires et apparence des modèles pour
+/// l'événement en cours, avec un aperçu en direct, puis la liste des modèles. Chaque modification est enregistrée automatiquement.
 /// </summary>
 public partial class CustomizationPanel : UserControl
 {
@@ -70,13 +70,22 @@ public partial class CustomizationPanel : UserControl
         TextFontCombo.ItemsSource = _fonts;
     }
 
-    private AppServices Services => _services ?? throw new InvalidOperationException("Onglet de personnalisation non initialisé.");
+    private AppServices Services => _services ?? throw new InvalidOperationException("Page de personnalisation non initialisée.");
     private EventCustomization Customization => Services.Customization;
     private EventDesign Design => Customization.Design;
+
+    /// <summary>Un modèle a été importé, modifié, copié ou supprimé (l'admin met à jour les réglages du pilote par format).</summary>
+    public event EventHandler? TemplatesChanged;
 
     public void Initialize(AppServices services)
     {
         _services = services;
+        TemplatesView.Initialize(services);
+        TemplatesView.TemplatesChanged += (_, _) =>
+        {
+            LoadFromEvent();
+            TemplatesChanged?.Invoke(this, EventArgs.Empty);
+        };
         _themes.Clear();
         foreach (var preset in ThemeCatalog.All) _themes.Add(new ThemeCard(preset));
 
@@ -98,7 +107,6 @@ public partial class CustomizationPanel : UserControl
         try
         {
             var ev = Services.CurrentEvent;
-            EventTitle.Text = $"Personnalisation de l'événement « {ev.Name} »";
             var templates = Services.Templates.LoadAll();
 
             _formats.Clear();
@@ -142,7 +150,11 @@ public partial class CustomizationPanel : UserControl
         UpdatePreviewNote();
         SchedulePreview();
         _ = RefreshThumbnailsAsync();
+        if (TemplatesExpander.IsExpanded) TemplatesView.Load();
     }
+
+    /// <summary>La liste des modèles (avec un aperçu de chacun) n'est chargée qu'à l'ouverture de sa section.</summary>
+    private void TemplatesExpander_Expanded(object sender, RoutedEventArgs e) => TemplatesView.Load();
 
     private void UpdatePreviewNote()
     {
@@ -252,7 +264,7 @@ public partial class CustomizationPanel : UserControl
         if (text.Length > 0 && !text.StartsWith('#')) text = "#" + text;
         var valid = text.Length == 7 && text.Skip(1).All(Uri.IsHexDigit);
         if (valid) box.ClearValue(Control.BorderBrushProperty);
-        else box.BorderBrush = Brushes.Red;
+        else box.SetResourceReference(Control.BorderBrushProperty, "Admin.Error");
         return valid ? text.ToUpperInvariant() : current;
     }
 
@@ -537,10 +549,16 @@ public partial class CustomizationPanel : UserControl
         }
     }
 
+    /// <summary>Coche un seul choix d'aperçu : les autres sont décochés, même si la liste n'est pas encore affichée.</summary>
+    private void SelectPreviewItem(PreviewFormatItem? item)
+    {
+        if (item == null) return;
+        foreach (var other in _previewFormats) other.IsSelected = ReferenceEquals(other, item);
+    }
+
     private void ShowAttractPreview()
     {
-        var item = _previewFormats.FirstOrDefault(p => p.IsAttractScreen);
-        if (item != null && !item.IsSelected) item.IsSelected = true;
+        SelectPreviewItem(_previewFormats.FirstOrDefault(p => p.IsAttractScreen));
         _previewAttract = true;
         UpdatePreviewNote();
         SchedulePreview();
@@ -551,6 +569,28 @@ public partial class CustomizationPanel : UserControl
     /// <summary>Aperçu de l'écran d'accueil (captures de vérification).</summary>
     internal void ShowAttractPreviewForCapture() => ShowAttractPreview();
 
+    /// <summary>Aperçu du premier format, le 10x15 (captures de vérification).</summary>
+    internal void ShowFormatPreviewForCapture()
+    {
+        var item = _previewFormats.FirstOrDefault(p => !p.IsAttractScreen);
+        if (item == null) return;
+        SelectPreviewItem(item);
+        _previewAttract = false;
+        _previewTemplate = item.Template;
+        UpdatePreviewNote();
+        SchedulePreview();
+    }
+
+    /// <summary>Ouvre la section des modèles et la fait défiler en haut des réglages (captures de vérification).</summary>
+    internal void ShowTemplatesForCapture()
+    {
+        TemplatesExpander.IsExpanded = true;
+        SettingsScroll.UpdateLayout();
+        if (SettingsScroll.Content is not UIElement settings) return;
+        var top = TemplatesExpander.TranslatePoint(new Point(0, 0), settings).Y;
+        ScrollSettings(Math.Max(0, top - 8));
+    }
+
     private async void PrintTest_Click(object sender, RoutedEventArgs e)
     {
         var template = _previewTemplate;
@@ -558,14 +598,15 @@ public partial class CustomizationPanel : UserControl
         var printer = Services.EffectivePrinterName;
         if (string.IsNullOrWhiteSpace(printer))
         {
-            ShowError("Choisissez d'abord l'imprimante (onglet Impression).");
+            ShowError("Choisissez d'abord l'imprimante (page Impression).");
             return;
         }
         var owner = Window.GetWindow(this);
-        var answer = MessageBox.Show(owner,
-            $"Imprimer un essai « {template.Name} » avec des photos d'exemple ?\nCela utilise une feuille de papier.",
-            "LibreBooth", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!AdminDialog.Ask(owner, $"Imprimer un essai « {template.Name} » avec des photos d'exemple ?\n\nCela utilise une feuille de papier.",
+                "Imprimer l'essai"))
+        {
+            return;
+        }
 
         Flush();
         PrintTestButton.IsEnabled = false;
@@ -682,8 +723,7 @@ public partial class CustomizationPanel : UserControl
 
     private void ShowPreviewOf(Template template)
     {
-        var item = _previewFormats.FirstOrDefault(p => p.Template?.Id == template.Id);
-        if (item != null && !item.IsSelected) item.IsSelected = true;
+        SelectPreviewItem(_previewFormats.FirstOrDefault(p => p.Template?.Id == template.Id));
         _previewTemplate = template;
         _previewAttract = false;
         UpdatePreviewNote();
@@ -797,10 +837,13 @@ public partial class CustomizationPanel : UserControl
             StatusText.Text = "Choisissez d'abord l'événement à reprendre.";
             return;
         }
-        var answer = MessageBox.Show(Window.GetWindow(this),
-            $"Remplacer la personnalisation de « {Services.CurrentEvent.Name} » par celle de « {source.Name} » ?",
-            "LibreBooth", MessageBoxButton.YesNo, MessageBoxImage.Question);
-        if (answer != MessageBoxResult.Yes) return;
+        if (!AdminDialog.Ask(Window.GetWindow(this),
+                $"Remplacer la personnalisation de « {Services.CurrentEvent.Name} » par celle de « {source.Name} » ?\n\n"
+                + "Formats, exemplaires, thème, textes, fond, logo et image d'accueil de cet événement seront remplacés.",
+                "Remplacer", image: MessageBoxImage.Warning, defaultConfirm: false))
+        {
+            return;
+        }
         try
         {
             _saveTimer.Stop();
@@ -817,7 +860,7 @@ public partial class CustomizationPanel : UserControl
     }
 
     private void ShowError(string message) =>
-        MessageBox.Show(Window.GetWindow(this), message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
+        AdminDialog.Show(Window.GetWindow(this), message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
 }
 
 /// <summary>Choix d'une liste déroulante : une valeur et son libellé.</summary>
@@ -896,13 +939,8 @@ public sealed class ThemeCard : NotifyBase
             if (_isCurrent == value) return;
             _isCurrent = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(BorderBrush));
-            OnPropertyChanged(nameof(BorderThickness));
         }
     }
-
-    public Brush BorderBrush => IsCurrent ? Brushes.DodgerBlue : Brushes.LightGray;
-    public Thickness BorderThickness => IsCurrent ? new Thickness(3) : new Thickness(1);
 }
 
 public sealed record BackgroundItem(Template Template, string Style, string Name, string State, bool HasBackground, ImageSource? Thumbnail);

@@ -35,6 +35,9 @@ public sealed class PrinterMonitor : IDisposable
     public PrinterHealth Current { get; private set; } =
         new(true, PrinterCondition.Unknown, "Vérification de l'imprimante…", null, false, "", DateTime.Now);
 
+    /// <summary>L'imprimante a été interrogée au moins une fois depuis le lancement (sinon Current dit « Vérification… »).</summary>
+    public bool HasChecked { get; private set; }
+
     public event EventHandler? Changed;
 
     public void Start() => _timer = new Timer(_ => _ = RefreshAsync(), null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(15));
@@ -48,6 +51,7 @@ public sealed class PrinterMonitor : IDisposable
         try
         {
             Current = await ComputeAsync().ConfigureAwait(false);
+            HasChecked = true;
             if (Current.Message != _lastMessage)
             {
                 _lastMessage = Current.Message;

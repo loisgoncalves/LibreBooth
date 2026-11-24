@@ -31,6 +31,7 @@ public partial class TemplateEditorWindow : Window
     public TemplateEditorWindow(AppServices services, Template template, string? message = null)
     {
         InitializeComponent();
+        AdminTheme.Attach(this);
         _services = services;
         _template = template;
         _layout = JsonDefaults.Clone(template.Layout);
@@ -38,7 +39,7 @@ public partial class TemplateEditorWindow : Window
         InfoText.Text = message ?? "";
         if (_layout.IsCustomizable)
         {
-            // Le décor, les textes et le fond viennent de l'onglet Personnalisation : ici, seules les photos se placent.
+            // Le décor, les textes et le fond viennent de la page Personnalisation : ici, seules les photos se placent.
             TextsSection.Visibility = Visibility.Collapsed;
             FrameOptions.Visibility = Visibility.Collapsed;
             BwCheck.Visibility = Visibility.Collapsed;
@@ -46,9 +47,10 @@ public partial class TemplateEditorWindow : Window
             if (string.IsNullOrEmpty(message))
             {
                 InfoText.Text = "Modèle personnalisable : ici, vous réglez la place et la taille des photos. "
-                                + "Couleurs, textes, fond et logo se règlent dans l'onglet Personnalisation.";
+                                + "Couleurs, textes, fond et logo se règlent dans la page Personnalisation.";
             }
         }
+        InfoPanel.Visibility = string.IsNullOrWhiteSpace(InfoText.Text) ? Visibility.Collapsed : Visibility.Visible;
         NameBox.Text = _layout.Name;
         StripCheck.IsChecked = _layout.DuplicateStrip;
         BwCheck.IsChecked = _layout.BlackAndWhite;
@@ -122,7 +124,7 @@ public partial class TemplateEditorWindow : Window
             IsHitTestVisible = false,
         });
 
-        var move = new Thumb { Template = (ControlTemplate)FindResource("MoveThumbTemplate"), Cursor = Cursors.SizeAll };
+        var move = new Thumb { Template = (ControlTemplate)RootGrid.FindResource("MoveThumbTemplate"), Cursor = Cursors.SizeAll };
         move.DragStarted += (_, _) => SelectZone(index, redraw: false);
         move.DragDelta += (_, e) =>
         {
@@ -136,7 +138,7 @@ public partial class TemplateEditorWindow : Window
 
         var resize = new Thumb
         {
-            Template = (ControlTemplate)FindResource("ResizeThumbTemplate"),
+            Template = (ControlTemplate)RootGrid.FindResource("ResizeThumbTemplate"),
             Width = handle,
             Height = handle,
             HorizontalAlignment = HorizontalAlignment.Right,
@@ -252,8 +254,7 @@ public partial class TemplateEditorWindow : Window
             return;
         }
         if (_layout.Zones.Count > 0 &&
-            MessageBox.Show(this, "Remplacer les zones actuelles par celles détectées dans le PNG ?", "LibreBooth",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            !AdminDialog.Ask(this, "Remplacer les zones actuelles par celles détectées dans le PNG ?", "Remplacer les zones"))
         {
             return;
         }
@@ -396,8 +397,8 @@ public partial class TemplateEditorWindow : Window
             return;
         }
         if ((width != _layout.Width || height != _layout.Height) &&
-            MessageBox.Show(this, $"Le nouveau cadre mesure {width} × {height} px. Adapter la taille du modèle ?", "LibreBooth",
-                MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+            AdminDialog.Ask(this, $"Le nouveau cadre mesure {width} × {height} px. Adapter la taille du modèle ?", "Adapter la taille",
+                "Garder la taille actuelle"))
         {
             _layout.Width = width;
             _layout.Height = height;
@@ -469,9 +470,10 @@ public partial class TemplateEditorWindow : Window
             Height = 860,
             Topmost = true,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = new SolidColorBrush(Color.FromRgb(0x2B, 0x2B, 0x30)),
             Content = new Image { Source = image, Stretch = Stretch.Uniform, Margin = new Thickness(16) },
         };
+        AdminTheme.Attach(window);
+        window.SetResourceReference(BackgroundProperty, "Admin.Preview");
         window.ShowDialog();
     }
 
@@ -479,8 +481,8 @@ public partial class TemplateEditorWindow : Window
     {
         ApplyOptionsToLayout();
         if (_layout.Zones.Count == 0 &&
-            MessageBox.Show(this, "Ce modèle n'a aucune zone photo : il ne pourra pas être utilisé. Enregistrer quand même ?", "LibreBooth",
-                MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            !AdminDialog.Ask(this, "Ce modèle n'a aucune zone photo : il ne pourra pas être utilisé. Enregistrer quand même ?",
+                "Enregistrer quand même", image: MessageBoxImage.Warning, defaultConfirm: false))
         {
             return;
         }

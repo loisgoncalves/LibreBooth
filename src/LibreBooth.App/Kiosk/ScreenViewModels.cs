@@ -51,6 +51,7 @@ public partial class AttractViewModel : ObservableObject
     public bool HasBackground => Background != null;
 
     [ObservableProperty] private bool _isReady;
+    [ObservableProperty] private string _notReadyTitle = "Le photobooth se prépare…";
     [ObservableProperty] private string _notReadyMessage = "";
     [ObservableProperty] private string? _operatorWarning;
 

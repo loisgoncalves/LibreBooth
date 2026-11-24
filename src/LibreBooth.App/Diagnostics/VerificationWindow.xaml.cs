@@ -1,10 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Media;
 using LibreBooth.App.Admin;
 using LibreBooth.App.Hardware;
+using LibreBooth.App.Infrastructure;
 using LibreBooth.App.Services;
 using LibreBooth.Core.Config;
 using LibreBooth.Core.Hardware;
@@ -14,8 +15,8 @@ using Serilog;
 namespace LibreBooth.App.Diagnostics;
 
 /// <summary>
-/// Fenêtre de vérification de l'installation : chaque point vérifié s'affiche au fil de l'eau avec une pastille
-/// (vert : bon, bleu : information, orange : à vérifier, rouge : à corriger) et ce qu'il faut faire.
+/// Fenêtre de vérification de l'installation, aux couleurs de l'admin : chaque point vérifié s'affiche au fil de l'eau
+/// avec une icône (vert : bon, bleu : information, orange : à vérifier, rouge : à corriger) et ce qu'il faut faire.
 /// </summary>
 public partial class VerificationWindow : Window
 {
@@ -29,6 +30,7 @@ public partial class VerificationWindow : Window
     public VerificationWindow(AppServices? services, AppPaths? paths)
     {
         InitializeComponent();
+        AdminTheme.Attach(this);
         _services = services;
         _paths = paths;
         var view = CollectionViewSource.GetDefaultView(_results);
@@ -59,7 +61,7 @@ public partial class VerificationWindow : Window
         BusyBar.Visibility = Visibility.Visible;
         RerunButton.IsEnabled = false;
         SummaryText.Text = "Vérification en cours…";
-        SummaryText.Foreground = Brushes.DimGray;
+        SummaryText.SetResourceReference(TextBlock.ForegroundProperty, "Admin.TextMuted");
         try
         {
             await InstallationCheck.RunAsync(_services, _paths, result => _results.Add(result), run.Token);
@@ -87,14 +89,14 @@ public partial class VerificationWindow : Window
         if (errors == 0 && warnings == 0)
         {
             SummaryText.Text = "✓ Tout est prêt : LibreBooth peut fonctionner.";
-            SummaryText.Foreground = new SolidColorBrush(Color.FromRgb(0x1E, 0x7B, 0x34));
+            SummaryText.SetResourceReference(TextBlock.ForegroundProperty, "Admin.Success");
         }
         else
         {
             SummaryText.Text = (errors > 0 ? $"{errors} problème(s) à corriger" : "Aucun problème bloquant")
                                + (warnings > 0 ? $" · {warnings} point(s) à vérifier" : "")
                                + " (voir « À faire »).";
-            SummaryText.Foreground = new SolidColorBrush(errors > 0 ? Color.FromRgb(0xC4, 0x2B, 0x1C) : Color.FromRgb(0x8A, 0x4B, 0x00));
+            SummaryText.SetResourceReference(TextBlock.ForegroundProperty, errors > 0 ? "Admin.Error" : "Admin.Warning");
         }
         _log.Information("Vérification de l'installation : {Errors} problème(s), {Warnings} point(s) à vérifier", errors, warnings);
         foreach (var line in InstallationCheck.ToReport(_results)) _log.Information("[vérification] {Line}", line);
@@ -131,14 +133,14 @@ public partial class VerificationWindow : Window
                 NativeDrivers.Refresh();
                 _log.Information("SDK Canon ajouté dans {Folder} (EDSDK {Version})", NativeDrivers.UserFolder, version);
             }
-            MessageBox.Show(this, $"SDK Canon ajouté (EDSDK {version}). La vérification va être relancée.", "LibreBooth",
+            AdminDialog.Show(this, $"SDK Canon ajouté (EDSDK {version}). La vérification va être relancée.", "LibreBooth",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             await RunAsync();
         }
         catch (Exception ex)
         {
             _log.Warning(ex, "SDK Canon non ajouté");
-            MessageBox.Show(this, "Ce fichier ne convient pas : " + ex.Message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AdminDialog.Show(this, "Ce fichier ne convient pas : " + ex.Message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -162,7 +164,7 @@ public partial class VerificationWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "Rapport impossible à enregistrer : " + ex.Message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AdminDialog.Show(this, "Rapport impossible à enregistrer : " + ex.Message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
@@ -175,7 +177,7 @@ public partial class VerificationWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, "LibreBooth n'a pas pu être lancé : " + ex.Message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AdminDialog.Show(this, "LibreBooth n'a pas pu être lancé : " + ex.Message, "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

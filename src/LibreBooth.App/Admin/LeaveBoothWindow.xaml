@@ -1,61 +1,55 @@
 <Window x:Class="LibreBooth.App.Admin.LeaveBoothWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:infra="clr-namespace:LibreBooth.App.Infrastructure"
         Title="Quitter le photobooth"
         WindowStyle="None"
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
-        Topmost="True"
-        Background="#1E2028"
-        Foreground="White"
-        FontFamily="Segoe UI">
-    <Window.Resources>
-        <Style x:Key="ChoiceButton" TargetType="Button">
-            <Setter Property="Focusable" Value="False" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Background" Value="#2E323D" />
-            <Setter Property="FontSize" Value="28" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Height" Value="86" />
-            <Setter Property="Margin" Value="0,8" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="14" Padding="24,0">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.9" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Opacity" Value="0.75" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-    </Window.Resources>
-    <Border Padding="36" BorderBrush="#FFC83D" BorderThickness="2">
-        <StackPanel Width="460">
-            <TextBlock Text="Que voulez-vous faire ?" FontSize="30" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,18" />
-            <Button Style="{StaticResource ChoiceButton}" Background="#1E7B34" Click="Admin_Click">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" VerticalAlignment="Center" Margin="0,0,18,0" />
-                    <TextBlock Text="Revenir à l'admin" VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
-            <Button Style="{StaticResource ChoiceButton}" Background="#A4262C" Click="Quit_Click">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#xE7E8;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" VerticalAlignment="Center" Margin="0,0,18,0" />
-                    <TextBlock Text="Quitter LibreBooth" VerticalAlignment="Center" />
-                </StackPanel>
-            </Button>
-            <Button Style="{StaticResource ChoiceButton}" Content="Annuler" FontSize="22" FontWeight="Normal" Height="64" Margin="0,18,0,0" Click="Cancel_Click" />
+        Topmost="True">
+    <!-- Aux couleurs de l'admin, en clair ou en sombre. Styles sur la bordure (et pas sur la fenêtre) : les captures les gardent. -->
+    <Border Background="{DynamicResource Admin.Window}" BorderBrush="{DynamicResource Admin.Accent}" BorderThickness="2" Padding="36,30"
+            TextElement.Foreground="{DynamicResource Admin.Text}" TextElement.FontFamily="Segoe UI" TextElement.FontSize="16">
+        <Border.Resources>
+            <ResourceDictionary>
+                <ResourceDictionary.MergedDictionaries>
+                    <ResourceDictionary Source="/LibreBooth;component/Resources/AdminStyles.xaml" />
+                </ResourceDictionary.MergedDictionaries>
+                <!-- Grands boutons, pour le doigt -->
+                <Style x:Key="BigChoice" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                    <Setter Property="Focusable" Value="False" />
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="FontSize" Value="24" />
+                    <Setter Property="MinHeight" Value="78" />
+                    <Setter Property="Margin" Value="0,8" />
+                    <Setter Property="infra:AdminUi.CornerRadius" Value="12" />
+                </Style>
+                <Style x:Key="BigAccent" TargetType="Button" BasedOn="{StaticResource AccentButton}">
+                    <Setter Property="Focusable" Value="False" />
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="FontSize" Value="24" />
+                    <Setter Property="MinHeight" Value="78" />
+                    <Setter Property="Margin" Value="0,8" />
+                    <Setter Property="infra:AdminUi.CornerRadius" Value="12" />
+                </Style>
+                <Style x:Key="BigDanger" TargetType="Button" BasedOn="{StaticResource DangerButton}">
+                    <Setter Property="Focusable" Value="False" />
+                    <Setter Property="Cursor" Value="Hand" />
+                    <Setter Property="FontSize" Value="24" />
+                    <Setter Property="MinHeight" Value="78" />
+                    <Setter Property="Margin" Value="0,8" />
+                    <Setter Property="infra:AdminUi.CornerRadius" Value="12" />
+                </Style>
+            </ResourceDictionary>
+        </Border.Resources>
+
+        <StackPanel Width="440">
+            <TextBlock Text="Que voulez-vous faire ?" FontSize="28" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,0,0,14" />
+            <Button Style="{StaticResource BigAccent}" Content="Revenir à l'admin" infra:AdminUi.Glyph="&#xE713;" Click="Admin_Click" />
+            <Button Style="{StaticResource BigDanger}" Content="Quitter LibreBooth" infra:AdminUi.Glyph="&#xE7E8;" Click="Quit_Click" />
+            <Button Style="{StaticResource BigChoice}" Content="Annuler" FontSize="20" MinHeight="58" Margin="0,16,0,0" Click="Cancel_Click" />
         </StackPanel>
     </Border>
 </Window>

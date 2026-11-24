@@ -41,7 +41,7 @@ internal sealed class BoothShell
     {
         var store = new SettingsStore(paths.ConfigFile);
         var settings = store.Load();
-        var hint = settings.AdminPin == "1234" ? "Code par défaut : 1234 (à changer dans l'onglet Système)" : null;
+        var hint = settings.AdminPin == "1234" ? "Code par défaut : 1234 (à changer dans la page Système de l'admin)" : null;
         var pin = new PinWindow(settings.AdminPin, "Code administrateur", hint, standalone: true);
         if (pin.ShowDialog() != true) return false;
 

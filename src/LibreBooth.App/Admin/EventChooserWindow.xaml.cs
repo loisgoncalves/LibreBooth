@@ -31,6 +31,7 @@ public partial class EventChooserWindow : Window
     public EventChooserWindow(EventStore events, string? currentFolder, bool atStartup)
     {
         InitializeComponent();
+        AdminTheme.Attach(this);
         _events = events;
         _currentFolder = currentFolder;
         _atStartup = atStartup;
@@ -42,6 +43,8 @@ public partial class EventChooserWindow : Window
         {
             ShowInTaskbar = true;
             CancelButton.Content = "Quitter LibreBooth";
+            CancelButton.SetResourceReference(StyleProperty, "DangerSubtleButton");
+            AdminUi.SetGlyph(CancelButton, "");
         }
         else
         {
@@ -155,10 +158,11 @@ public partial class EventChooserWindow : Window
         var same = _events.FindSame(name, date);
         if (same != null)
         {
-            var answer = MessageBox.Show(this,
+            var answer = AdminDialog.Choose(this,
                 $"L'événement « {same.Name} » du {TextUtil.FormatDate(same.Date)} existe déjà.\n\n"
-                + "Oui : ouvrir cet événement\nNon : créer quand même un deuxième événement",
-                "LibreBooth", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                + "Voulez-vous l'ouvrir, ou créer quand même un deuxième événement du même nom ?",
+                MessageBoxImage.Question, MessageBoxResult.Yes, MessageBoxResult.Cancel,
+                ("Ouvrir l'existant", MessageBoxResult.Yes), ("Créer un deuxième", MessageBoxResult.No), ("Annuler", MessageBoxResult.Cancel));
             if (answer == MessageBoxResult.Cancel) return;
             if (answer == MessageBoxResult.Yes)
             {
@@ -188,9 +192,9 @@ public partial class EventChooserWindow : Window
             catch (Exception ex)
             {
                 _log.Error(ex, "Personnalisation de {Source} non reprise", source.Name);
-                MessageBox.Show(this,
+                AdminDialog.Show(this,
                     $"L'événement est créé, mais la personnalisation de « {source.Name} » n'a pas pu être reprise :\n{ex.Message}\n\n"
-                    + "Vous pourrez la reprendre dans l'onglet Personnalisation.",
+                    + "Vous pourrez la reprendre dans la page Personnalisation.",
                     "LibreBooth", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -288,6 +292,9 @@ public partial class EventChooserWindow : Window
         public event PropertyChangedEventHandler? PropertyChanged;
 
         private void OnPropertyChanged([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
+        /// <summary>Ce que lit un lecteur d'écran pour la ligne de la liste : le nom, la date et les chiffres de l'événement.</summary>
+        public override string ToString() => $"{Name}, {DateText}, {StatsText}";
 
         private static string Plural(int count, string word) => $"{count} {word}{(count > 1 ? "s" : "")}";
 

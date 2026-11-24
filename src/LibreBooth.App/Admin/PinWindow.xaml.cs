@@ -1,10 +1,12 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
+using LibreBooth.App.Infrastructure;
 
 namespace LibreBooth.App.Admin;
 
-/// <summary>Saisie du code PIN avant d'ouvrir l'admin (pavé tactile ou clavier).</summary>
+/// <summary>Saisie du code PIN avant d'ouvrir l'admin (pavé tactile ou clavier), aux couleurs de l'admin.</summary>
 public partial class PinWindow : Window
 {
     private readonly string _expectedPin;
@@ -16,6 +18,7 @@ public partial class PinWindow : Window
     public PinWindow(string expectedPin, string title = "Code administrateur", string? hint = null, bool standalone = false)
     {
         InitializeComponent();
+        AdminTheme.Attach(this);
         _expectedPin = expectedPin;
         TitleText.Text = title;
         Title = "LibreBooth – " + title;
@@ -33,7 +36,8 @@ public partial class PinWindow : Window
         foreach (var key in new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "OK" })
         {
             var button = new Button { Content = key };
-            button.SetResourceReference(StyleProperty, "PinKey");
+            button.SetResourceReference(StyleProperty, key == "OK" ? "PinOkKey" : "PinKey");
+            AutomationProperties.SetName(button, key == "⌫" ? "Effacer" : key);
             button.Click += (_, _) => Press(key);
             Keypad.Children.Add(button);
         }

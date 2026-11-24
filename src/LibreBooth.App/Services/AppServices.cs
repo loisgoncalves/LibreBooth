@@ -8,6 +8,7 @@ using LibreBooth.App.Hardware.Demo;
 using LibreBooth.App.Hardware.Printing;
 using LibreBooth.App.Infrastructure;
 using LibreBooth.App.Kiosk;
+using LibreBooth.Core.Admin;
 using LibreBooth.Core.Config;
 using LibreBooth.Core.Design;
 using LibreBooth.Core.Events;
@@ -453,6 +454,16 @@ public sealed class AppServices : IDisposable
 
     /// <summary>Captures de vérification : montre l'admin d'une copie installée (true) ou d'une copie décompressée (false).</summary>
     internal static bool? InstalledCopyForCapture { get; set; }
+
+    /// <summary>
+    /// Place libre sur le disque des photos de l'événement en cours, et le nom de ce disque ; null si elle est inconnue
+    /// (dossier réseau, disque illisible). Voir <see cref="DiskSpace"/> pour les seuils.
+    /// </summary>
+    public (long FreeBytes, string DriveName)? ProbePhotoDisk() =>
+        FreeDiskBytesForCapture is { } simulated ? (simulated, "C:") : DiskSpace.Probe(CurrentEvent.Folder);
+
+    /// <summary>Captures de vérification : place libre simulée sur le disque des photos (null : le vrai disque).</summary>
+    internal static long? FreeDiskBytesForCapture { get; set; }
 
     /// <summary>Captures de vérification : une nouvelle version fictive, comme si GitHub l'avait annoncée.</summary>
     internal void ShowUpdateForCapture(UpdateInfo? update)

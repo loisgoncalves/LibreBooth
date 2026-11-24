@@ -6,6 +6,30 @@ même. La version installée s'affiche dans l'admin › Système.
 Numéro majeure.fonction.correctif : **majeure** quand les habitudes ou les fichiers de l'utilisateur changent,
 **fonction** pour une nouveauté, **correctif** pour une correction (voir le README, « Numéros de version »).
 
+## 3.0.0 – 24/11/2026
+
+Version majeure : l'admin change d'allure et se parcourt autrement. Les réglages, les événements et le photobooth
+des invités restent les mêmes : rien n'est converti.
+
+- **Admin modernisée** : un menu à gauche (Accueil, Événement, Personnalisation, Appareil photo, Impression, Écrans,
+  Système), réduit aux icônes sur un petit écran ; des cartes, des interrupteurs expliqués en une phrase, et en bas
+  de chaque page l'état de l'appareil, de l'imprimante et du papier.
+- **Accueil « Prêt pour l'événement ? »** : l'événement ouvert et ses chiffres, puis un point par élément à vérifier
+  (appareil photo, imprimante, papier, formats proposés, limite d'impressions, espace disque, mise à jour), en vert,
+  orange ou rouge, avec un bouton vers la bonne page. Raccourcis : photo de test, essai d'impression, réimpression,
+  vérification de l'installation.
+- **Clair ou sombre** : admin › Système › Apparence, appliqué tout de suite à toutes les fenêtres de l'admin, barre
+  de titre comprise.
+- **Même style partout** : code PIN, choix de l'événement, « Revenir à l'admin ou quitter », vérification de
+  l'installation, éditeur de modèle. Les confirmations deviennent des fenêtres LibreBooth dont les boutons disent
+  l'action (« Quitter LibreBooth », « Supprimer », « Démarrer quand même »).
+- **Espace disque surveillé** : sous 2 Go libres sur le disque des photos, « Démarrer le photobooth » prévient (on
+  peut démarrer quand même). Sous 300 Mo, le photobooth ne lance plus de session : l'accueil affiche « Le photobooth
+  fait une pause » et un message pour l'animateur, puis les sessions reprennent dès que de la place est libérée. La
+  vérification de l'installation suit les mêmes seuils.
+- Les modèles et cadres PNG rejoignent la page Personnalisation, le journal la page Système.
+- **Windows 10** : quand les icônes de Windows 11 manquent, l'admin prend celles de Windows 10.
+
 ## 2.0.0 – 23/11/2026
 
 Version majeure : les dossiers des événements changent (les anciens sont convertis au premier lancement).

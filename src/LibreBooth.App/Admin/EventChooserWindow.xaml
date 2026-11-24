@@ -1,79 +1,16 @@
 <Window x:Class="LibreBooth.App.Admin.EventChooserWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:infra="clr-namespace:LibreBooth.App.Infrastructure"
         Title="LibreBooth – Choisir l'événement"
         Width="1080" Height="720" MinWidth="860" MinHeight="560"
-        WindowStartupLocation="CenterScreen"
-        FontFamily="Segoe UI" FontSize="16">
+        WindowStartupLocation="CenterScreen">
 
-    <Grid x:Name="RootGrid" Background="White" TextElement.FontSize="16" TextElement.FontFamily="Segoe UI">
-        <!-- Styles sur la grille (et pas sur la fenêtre) : les captures de vérification les gardent. -->
+    <Grid x:Name="RootGrid" Background="{DynamicResource Admin.Window}" TextElement.Foreground="{DynamicResource Admin.Text}"
+          TextElement.FontSize="16" TextElement.FontFamily="Segoe UI">
+        <!-- Styles de l'admin sur la grille (et pas sur la fenêtre) : les captures de vérification les gardent. -->
         <Grid.Resources>
-            <Style TargetType="Button">
-                <Setter Property="Padding" Value="16,6" />
-                <Setter Property="Margin" Value="0,4,8,4" />
-                <Setter Property="MinHeight" Value="38" />
-            </Style>
-            <Style x:Key="Primary" TargetType="Button">
-                <Setter Property="Foreground" Value="White" />
-                <Setter Property="Background" Value="#1E7B34" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Padding" Value="20,8" />
-                <Setter Property="Margin" Value="0,4,8,4" />
-                <Setter Property="MinHeight" Value="42" />
-                <Setter Property="Cursor" Value="Hand" />
-                <Setter Property="Template">
-                    <Setter.Value>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="Bd" Property="Opacity" Value="0.9" />
-                                </Trigger>
-                                <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="Bd" Property="Opacity" Value="0.75" />
-                                </Trigger>
-                                <Trigger Property="IsKeyboardFocused" Value="True">
-                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#0B3D18" />
-                                    <Setter TargetName="Bd" Property="BorderThickness" Value="2" />
-                                </Trigger>
-                                <Trigger Property="IsEnabled" Value="False">
-                                    <Setter TargetName="Bd" Property="Background" Value="#9DB5A3" />
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Setter.Value>
-                </Setter>
-            </Style>
-            <Style TargetType="TextBox">
-                <Setter Property="Padding" Value="6,5" />
-                <Setter Property="Margin" Value="0,2,0,4" />
-            </Style>
-            <Style TargetType="ComboBox">
-                <Setter Property="Margin" Value="0,2,0,4" />
-                <Setter Property="Padding" Value="6,5" />
-            </Style>
-            <Style TargetType="DatePicker">
-                <Setter Property="Margin" Value="0,2,0,4" />
-            </Style>
-            <Style x:Key="FieldLabel" TargetType="TextBlock">
-                <Setter Property="Margin" Value="0,10,0,2" />
-                <Setter Property="Foreground" Value="#333" />
-            </Style>
-            <Style x:Key="Help" TargetType="TextBlock">
-                <Setter Property="Foreground" Value="#666" />
-                <Setter Property="TextWrapping" Value="Wrap" />
-                <Setter Property="FontSize" Value="13" />
-                <Setter Property="Margin" Value="0,0,0,4" />
-            </Style>
-            <Style x:Key="SectionTitle" TargetType="TextBlock">
-                <Setter Property="FontSize" Value="20" />
-                <Setter Property="FontWeight" Value="SemiBold" />
-                <Setter Property="Foreground" Value="#141414" />
-                <Setter Property="Margin" Value="0,0,0,6" />
-            </Style>
+            <ResourceDictionary Source="/LibreBooth;component/Resources/AdminStyles.xaml" />
         </Grid.Resources>
 
         <Grid.RowDefinitions>
@@ -83,19 +20,19 @@
         </Grid.RowDefinitions>
 
         <!-- En-tête -->
-        <Border Background="#F4F8F5" BorderBrush="#D5E6DA" BorderThickness="0,0,0,1" Padding="16,10">
+        <Border Background="{DynamicResource Admin.Sidebar}" BorderBrush="{DynamicResource Admin.Divider}" BorderThickness="0,0,0,1" Padding="24,14">
             <DockPanel>
-                <Image Source="pack://application:,,,/Resources/icone-librebooth.png" Height="48" DockPanel.Dock="Left"
+                <Image Source="pack://application:,,,/Resources/icone-librebooth.png" Width="48" Height="48" DockPanel.Dock="Left"
                        RenderOptions.BitmapScalingMode="HighQuality" VerticalAlignment="Center" />
-                <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
-                    <TextBlock x:Name="HeaderTitle" Text="Quel événement voulez-vous ouvrir ?" FontSize="24" FontWeight="Bold" Foreground="#141414" />
+                <StackPanel Margin="14,0,0,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="HeaderTitle" Text="Quel événement voulez-vous ouvrir ?" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
                     <TextBlock Text="Chaque événement a ses propres photos et sa propre personnalisation (thème, textes, fonds, logo)."
-                               FontSize="14" Foreground="#555" TextWrapping="Wrap" />
+                               Style="{StaticResource Help}" Margin="0,2,0,0" />
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <Grid Grid.Row="1" Margin="16">
+        <Grid Grid.Row="1" Margin="24,20,24,16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="390" />
                 <ColumnDefinition Width="20" />
@@ -103,88 +40,81 @@
             </Grid.ColumnDefinitions>
 
             <!-- Nouvel événement -->
-            <Border BorderBrush="#D5E6DA" BorderThickness="1" CornerRadius="8" Padding="18,14" Background="#FAFCFA">
+            <Border Style="{StaticResource Card}" Margin="0" Padding="0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
+                    <StackPanel Margin="20,16,20,18">
                         <TextBlock Text="Créer un nouvel événement" Style="{StaticResource SectionTitle}" />
                         <TextBlock Text="Nom de l'événement" Style="{StaticResource FieldLabel}" />
-                        <TextBox x:Name="NewNameBox" MaxLength="80" KeyDown="NewNameBox_KeyDown" />
-                        <TextBlock Text="Par exemple « Mariage Julie et Tom ». Il peut apparaître sur les photos imprimées."
-                                   Style="{StaticResource Help}" />
+                        <TextBox x:Name="NewNameBox" MaxLength="80" KeyDown="NewNameBox_KeyDown" AutomationProperties.Name="Nom de l'événement" />
+                        <TextBlock Text="Par exemple « Mariage Julie et Tom ». Il peut apparaître sur les photos imprimées." Style="{StaticResource Help}" />
                         <TextBlock Text="Date" Style="{StaticResource FieldLabel}" />
-                        <DatePicker x:Name="NewDatePicker" Width="200" HorizontalAlignment="Left" />
-                        <TextBlock Text="Personnalisation de départ" Style="{StaticResource FieldLabel}" />
-                        <ComboBox x:Name="CopyCombo" DisplayMemberPath="Label" />
-                        <TextBlock Text="Reprendre celle d'un autre événement évite de tout refaire ; elle reste modifiable dans l'onglet Personnalisation."
+                        <DatePicker x:Name="NewDatePicker" Width="200" HorizontalAlignment="Left" AutomationProperties.Name="Date de l'événement" />
+                        <TextBlock Text="Personnalisation de départ" Style="{StaticResource FieldLabel}" Margin="0,14,0,4" />
+                        <ComboBox x:Name="CopyCombo" DisplayMemberPath="Label" AutomationProperties.Name="Personnalisation de départ" />
+                        <TextBlock Text="Reprendre celle d'un autre événement évite de tout refaire ; elle reste modifiable dans la page Personnalisation."
                                    Style="{StaticResource Help}" />
-                        <TextBlock x:Name="NewErrorText" Foreground="#A4262C" TextWrapping="Wrap" FontSize="14" Margin="0,4,0,0" />
-                        <Button x:Name="CreateButton" Style="{StaticResource Primary}" HorizontalAlignment="Left" Margin="0,10,0,0"
-                                Click="Create_Click">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="&#xE710;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" VerticalAlignment="Center" Margin="0,0,10,0" />
-                                <TextBlock Text="Créer l'événement" VerticalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
+                        <TextBlock x:Name="NewErrorText" Foreground="{DynamicResource Admin.Error}" TextWrapping="Wrap" FontSize="14" Margin="0,4,0,0" />
+                        <Button x:Name="CreateButton" Style="{StaticResource AccentButton}" HorizontalAlignment="Left" Margin="0,10,0,0"
+                                Content="Créer l'événement" infra:AdminUi.Glyph="&#xE710;" Click="Create_Click" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>
 
             <!-- Événements existants -->
             <DockPanel Grid.Column="2">
-                <TextBlock DockPanel.Dock="Top" Text="Ouvrir un événement existant" Style="{StaticResource SectionTitle}" Margin="0,14,0,8" />
-                <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
-                    <Button x:Name="OpenButton" Style="{StaticResource Primary}" DockPanel.Dock="Left" Click="Open_Click">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="&#xE8E5;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <TextBlock Text="Ouvrir l'événement" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <TextBlock x:Name="OpenErrorText" Foreground="#A4262C" TextWrapping="Wrap" FontSize="14" VerticalAlignment="Center" />
+                <TextBlock DockPanel.Dock="Top" Text="Ouvrir un événement existant" Style="{StaticResource SectionTitle}" Margin="0,14,0,10" />
+                <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+                    <Button x:Name="OpenButton" Style="{StaticResource AccentButton}" DockPanel.Dock="Left" Content="Ouvrir l'événement"
+                            infra:AdminUi.Glyph="&#xE8E5;" Click="Open_Click" />
+                    <TextBlock x:Name="OpenErrorText" Foreground="{DynamicResource Admin.Error}" TextWrapping="Wrap" FontSize="14" VerticalAlignment="Center" />
                 </DockPanel>
-                <Grid>
-                    <ListBox x:Name="EventsList" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                             MouseDoubleClick="EventsList_MouseDoubleClick" KeyDown="EventsList_KeyDown" BorderBrush="#D5E6DA">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="4,6">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="128" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Border Width="114" Height="76" Background="#EEF2EF" CornerRadius="4" HorizontalAlignment="Left">
-                                        <Grid>
-                                            <TextBlock Text="&#xE722;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="26" Foreground="#B5C4B9"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
-                                        </Grid>
-                                    </Border>
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                        <DockPanel>
-                                            <Border DockPanel.Dock="Right" Background="#1E7B34" CornerRadius="4" Padding="8,2" Margin="10,0,4,0"
-                                                    VerticalAlignment="Center" Visibility="{Binding BadgeVisibility}">
-                                                <TextBlock Text="{Binding Badge}" Foreground="White" FontSize="12" FontWeight="SemiBold" />
-                                            </Border>
-                                            <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                        </DockPanel>
-                                        <TextBlock Text="{Binding DateText}" Foreground="#444" FontSize="14" />
-                                        <TextBlock Text="{Binding StatsText}" Foreground="#666" FontSize="14" />
-                                    </StackPanel>
-                                </Grid>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                    <TextBlock x:Name="EmptyText" Visibility="Collapsed" TextWrapping="Wrap" Foreground="#666" FontSize="16" Margin="24"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
-                               Text="Aucun événement pour l'instant.&#x0a;Créez le premier à gauche : donnez-lui un nom, puis « Créer l'événement »." />
-                </Grid>
+                <Border Style="{StaticResource Card}" Margin="0" Padding="6">
+                    <Grid>
+                        <ListBox x:Name="EventsList" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="Événements"
+                                 MouseDoubleClick="EventsList_MouseDoubleClick" KeyDown="EventsList_KeyDown">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="2" AutomationProperties.Name="{Binding Name}">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Width="114" Height="76" Background="{DynamicResource Admin.Window}" CornerRadius="6" Margin="0,0,14,0">
+                                            <Grid>
+                                                <TextBlock Text="&#xE722;" FontFamily="{DynamicResource IconFont}" FontSize="26" Foreground="{DynamicResource Admin.TextMuted}"
+                                                           Opacity="0.6" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                            </Grid>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <DockPanel>
+                                                <Border DockPanel.Dock="Right" Background="{DynamicResource Admin.Accent}" CornerRadius="10" Padding="10,2" Margin="10,0,4,0"
+                                                        VerticalAlignment="Center" Visibility="{Binding BadgeVisibility}">
+                                                    <TextBlock Text="{Binding Badge}" Foreground="{DynamicResource Admin.OnAccent}" FontSize="12" FontWeight="SemiBold" />
+                                                </Border>
+                                                <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                            </DockPanel>
+                                            <TextBlock Text="{Binding DateText}" FontSize="14" />
+                                            <TextBlock Text="{Binding StatsText}" Foreground="{DynamicResource Admin.TextMuted}" FontSize="14" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <TextBlock x:Name="EmptyText" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{DynamicResource Admin.TextMuted}" Margin="24"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
+                                   Text="Aucun événement pour l'instant.&#x0a;Créez le premier à gauche : donnez-lui un nom, puis « Créer l'événement »." />
+                    </Grid>
+                </Border>
             </DockPanel>
         </Grid>
 
         <!-- Pied : où sont les photos, et quitter -->
-        <Border Grid.Row="2" Background="#F7F7F7" BorderBrush="#E3E3E3" BorderThickness="0,1,0,0" Padding="16,8">
+        <Border Grid.Row="2" Background="{DynamicResource Admin.Card}" BorderBrush="{DynamicResource Admin.Divider}" BorderThickness="0,1,0,0"
+                Padding="24,10">
             <DockPanel>
-                <Button x:Name="CancelButton" DockPanel.Dock="Right" Content="Quitter LibreBooth" Margin="8,4,0,4" Click="Cancel_Click" />
-                <TextBlock x:Name="FolderHelpText" VerticalAlignment="Center" Foreground="#666" FontSize="13" TextWrapping="Wrap" />
+                <Button x:Name="CancelButton" DockPanel.Dock="Right" Content="Annuler" Margin="16,0,0,0" Click="Cancel_Click" />
+                <TextBlock x:Name="FolderHelpText" Style="{StaticResource Help}" Margin="0" VerticalAlignment="Center" />
             </DockPanel>
         </Border>
     </Grid>
