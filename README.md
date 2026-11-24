@@ -58,7 +58,7 @@ propres impressions, ses propres écrans et son propre dossier de photos.
 
 | | Conseillé | Testé |
 |---|---|---|
-| PC | Windows 10 ou 11, **64 bits** | Windows 11 |
+| PC | Windows 10 ou 11, **64 bits** | Windows 10 et 11 |
 | Appareil photo | Canon EOS reconnu par le SDK Canon EDSDK 13, en USB | Canon EOS 1300D |
 | Imprimante | Imprimante photo DNP (sublimation thermique) | DNP DS620, rouleau 15x20 (deux 10x15 par feuille), pilote Windows 11 v2.0.1.2 |
 | Écran | Tactile de préférence (la souris marche aussi) | |
