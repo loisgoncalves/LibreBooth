@@ -41,7 +41,13 @@ public enum PaperReport
 /// <summary>Tous les réglages de LibreBooth, enregistrés dans config.json.</summary>
 public sealed class AppSettings
 {
-    public int Version { get; set; } = 1;
+    /// <summary>
+    /// Version du format de config.json. 2 depuis la 3.2.1 : un fichier en version 1 resté à l'ancienne capacité de
+    /// rouleau par défaut (700) passe à 400 (voir <see cref="Normalize"/>).
+    /// </summary>
+    public const int CurrentVersion = 2;
+
+    public int Version { get; set; } = CurrentVersion;
     public string AdminPin { get; set; } = "1234";
     public string? CurrentEventFolder { get; set; }
     public bool LaunchAtStartup { get; set; }
@@ -75,6 +81,13 @@ public sealed class AppSettings
         Camera.CaptureTimeoutSeconds = Math.Clamp(Camera.CaptureTimeoutSeconds, 4, 60);
 
         Print.DriverSettings ??= new();
+        if (Version < 2)
+        {
+            // Jusqu'à la 3.2.0, la capacité par défaut valait 700 tirages, bien plus qu'un rouleau 15x20 de DS620
+            // (200 feuilles, soit 400 tirages 10x15) : un config.json resté à cette valeur est corrigé une fois.
+            if (Print.MediaCapacity == PrintSettings.OldDefaultMediaCapacity) Print.MediaCapacity = PrintSettings.DefaultMediaCapacity;
+            Version = CurrentVersion;
+        }
         Print.AutoPrintCopies = Math.Clamp(Print.AutoPrintCopies, 1, 10);
         Print.EventPrintLimit = Math.Max(0, Print.EventPrintLimit);
         Print.LowMediaWarning = Math.Clamp(Print.LowMediaWarning, 0, 500);
@@ -128,8 +141,13 @@ public sealed class PrintSettings
     /// <summary>Lire le compteur et les erreurs de la DNP via cspstat.dll.</summary>
     public bool UseDnpStatus { get; set; } = true;
     public int LowMediaWarning { get; set; } = 30;
-    /// <summary>Compteur logiciel (si le statut DNP est indisponible) : capacité du rouleau.</summary>
-    public int MediaCapacity { get; set; } = 700;
+    /// <summary>Rouleau 15x20 de DS620 : 200 feuilles, coupées chacune en deux tirages 10x15.</summary>
+    public const int DefaultMediaCapacity = 400;
+    /// <summary>Capacité par défaut jusqu'à la 3.2.0 (trop élevée pour une DS620).</summary>
+    public const int OldDefaultMediaCapacity = 700;
+
+    /// <summary>Compteur logiciel (si le statut DNP est indisponible) : capacité du rouleau, en tirages 10x15.</summary>
+    public int MediaCapacity { get; set; } = DefaultMediaCapacity;
     public int PrintedSinceMediaChange { get; set; }
     /// <summary>
     /// Réponse des invités quand le compteur est à 0. Effacée par « J'ai installé un nouveau rouleau », ou dès que le

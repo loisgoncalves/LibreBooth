@@ -6,6 +6,16 @@ même. La version installée s'affiche dans l'admin › Système.
 Numéro majeure.fonction.correctif : **majeure** quand les habitudes ou les fichiers de l'utilisateur changent,
 **fonction** pour une nouveauté, **correctif** pour une correction (voir le README, « Numéros de version »).
 
+## 3.2.1 – 26/11/2026
+
+- **Capacité du rouleau** : 400 tirages par défaut au lieu de 700. Un rouleau 15x20 de DS620 compte 200 feuilles,
+  coupées chacune en deux tirages 10x15. Ce réglage ne sert qu'au compteur de LibreBooth, sans `cspstat.dll` ; avec
+  ce fichier, LibreBooth lit le compteur de la DNP, qui ne change pas.
+- **Mise à jour** : un PC resté à l'ancienne valeur par défaut (700) passe à 400, une seule fois ; une autre valeur
+  choisie dans l'admin est gardée. Les tirages restants baissent d'autant. Après un changement de rouleau, appuyez sur
+  « J'ai installé un nouveau rouleau » ; si le compteur tombe à 0 alors que le papier sort encore, le photobooth
+  demande aux invités si leur photo est sortie (depuis la 3.2.0).
+
 ## 3.2.0 – 26/11/2026
 
 Le compteur de papier peut se tromper : à 0, le photobooth n'arrête plus rien sans avoir demandé à l'invité.

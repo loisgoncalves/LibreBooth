@@ -432,7 +432,7 @@
                                 <infra:SettingRow Title="Alerte « papier bientôt terminé »" Description="À partir de ce nombre de tirages restants.">
                                     <TextBox Width="100" Margin="0" Text="{Binding Print.LowMediaWarning, UpdateSourceTrigger=PropertyChanged}" />
                                 </infra:SettingRow>
-                                <infra:SettingRow Title="Capacité du rouleau" Description="Pour le compteur de LibreBooth, utilisé si le compteur de la DNP est indisponible." Margin="0,0,0,4">
+                                <infra:SettingRow Title="Capacité du rouleau" Description="En tirages 10x15, pour le compteur de LibreBooth, utilisé si le compteur de la DNP est indisponible. Rouleau 15x20 de DS620 : 400." Margin="0,0,0,4">
                                     <TextBox Width="100" Margin="0" Text="{Binding Print.MediaCapacity, UpdateSourceTrigger=PropertyChanged}" />
                                 </infra:SettingRow>
                                 <TextBlock x:Name="MediaCounterText" Style="{StaticResource Help}" />
