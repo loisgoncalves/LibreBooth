@@ -38,14 +38,20 @@
                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
                                 <TextBlock Text="{Binding Detail}" Style="{StaticResource Help}" Margin="0,2,0,0" />
                             </StackPanel>
-                            <Button Grid.Column="2" Style="{StaticResource SubtleButton}" Margin="16,0,0,0" VerticalAlignment="Center"
-                                    Tag="{Binding}" Click="ReadinessAction_Click" AutomationProperties.Name="{Binding ActionName}"
-                                    Visibility="{Binding PageName, Converter={StaticResource NullToCollapsed}}">
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding PageName}" />
-                                    <TextBlock Text="&#xE76C;" FontFamily="{DynamicResource IconFont}" FontSize="12" Margin="8,1,0,0" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                <!-- Ligne Papier, compteur à 0 ou rouleau signalé vide : remettre le compteur à zéro sans changer de page -->
+                                <Button Margin="16,0,0,0" Click="NewRoll_Click" infra:AdminUi.Glyph="&#xE73E;"
+                                        Content="{Binding NewRollLabel}" AutomationProperties.Name="{Binding NewRollLabel}"
+                                        Visibility="{Binding NewRollLabel, Converter={StaticResource NullToCollapsed}}" />
+                                <Button Style="{StaticResource SubtleButton}" Margin="16,0,0,0"
+                                        Tag="{Binding}" Click="ReadinessAction_Click" AutomationProperties.Name="{Binding ActionName}"
+                                        Visibility="{Binding PageName, Converter={StaticResource NullToCollapsed}}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding PageName}" />
+                                        <TextBlock Text="&#xE76C;" FontFamily="{DynamicResource IconFont}" FontSize="12" Margin="8,1,0,0" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
                         </Grid>
                     </Border>
                     <DataTemplate.Triggers>

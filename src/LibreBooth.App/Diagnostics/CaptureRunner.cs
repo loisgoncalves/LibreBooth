@@ -118,6 +118,7 @@ internal static class CaptureRunner
             await SnapVersion14(services, kiosk, folder, Note);
             await SnapVersion20(services, kiosk, folder, Note);
             await SnapVersion30(services, kiosk, folder, Note);
+            await SnapVersion32(services, kiosk, folder, Note);
 
             var stats = services.CurrentEvent.Info.Stats;
             Note($"Statistiques de l'événement : {stats.Sessions} sessions, {stats.Photos} photos, {stats.Prints} impressions, {stats.Retakes} série(s) recommencée(s)");
@@ -158,15 +159,121 @@ internal static class CaptureRunner
             Foreground = (Brush)Application.Current.FindResource("ForegroundBrush"),
             FontFamily = (FontFamily)Application.Current.FindResource("KioskFont"),
         };
+        // Question sur le papier (3.2.0) : par-dessus l'écran, comme dans la fenêtre du photobooth.
+        var layers = new Grid();
+        layers.Children.Add(host);
+        var overlay = kiosk.PaperQuestion.IsVisible ? new ContentControl { Content = kiosk.PaperQuestion } : null;
+        if (overlay != null) layers.Children.Add(overlay);
         var root = new Border
         {
             Background = (Brush)Application.Current.FindResource("BackgroundBrush"),
             Width = Width,
             Height = Height,
-            Child = host,
+            Child = layers,
         };
         Render(root, Path.Combine(folder, name + ".png"), Width, Height);
         host.Content = null;
+        if (overlay != null) overlay.Content = null;
+    }
+
+    /// <summary>
+    /// Version 3.2.0 : compteur de papier à 0. Un invité répond « Non » deux fois (rouleau déclaré vide), puis, après
+    /// « J'ai installé un nouveau rouleau » et un compteur de nouveau à 0, un autre répond « Oui ».
+    /// </summary>
+    private static async Task SnapVersion32(AppServices services, KioskViewModel kiosk, string folder, Action<string> note)
+    {
+        var print = services.Settings.Print;
+        var savedCount = print.PrintedSinceMediaChange;
+        var savedReport = print.PaperReport;
+        var paperFolder = Path.Combine(folder, "papier");
+        Directory.CreateDirectory(paperFolder);
+        KioskViewModel.PaperDelayForCapture = TimeSpan.FromSeconds(1);
+        try
+        {
+            async Task<SessionData> PrintAtZeroAsync()
+            {
+                print.PrintedSinceMediaChange = print.MediaCapacity;
+                services.SaveSettings();
+                await services.PrinterMonitor.RefreshAsync();
+                if (services.PrinterMonitor.Current.RemainingPrints != 0)
+                    throw new InvalidOperationException($"Le compteur devrait être à 0 ({services.PrinterMonitor.Current.RemainingPrints})");
+                kiosk.ResumeAfterAdmin();
+                await WaitUntil(() => kiosk.State == KioskState.Attract && kiosk.Attract.IsReady, 10, "accueil prêt");
+                kiosk.StartSession();
+                await WaitUntil(() => kiosk.State == KioskState.ChooseTemplate, 20, "choix du format");
+                kiosk.Choose.ChooseCommand.Execute(kiosk.Choose.Cards.First(c => c.Template.Id == TemplateSeeder.PostcardId));
+                await WaitUntil(() => kiosk.State == KioskState.Review, 90, "revue");
+                var session = kiosk.CurrentSession!;
+                await kiosk.PrintCurrentAsync(1);
+                return session;
+            }
+
+            async Task SnapAdminHome(string name)
+            {
+                var admin = new AdminWindow(services, kiosk);
+                admin.LoadForCapture();
+                await Task.Delay(1500);
+                if (admin.Content is FrameworkElement content)
+                {
+                    admin.Content = null;
+                    Render(content, Path.Combine(paperFolder, name + ".png"), 1600, 1000);
+                }
+                admin.CloseWithoutPrompt();
+            }
+
+            // 1. Deux « Non » : nouvel essai, puis rouleau déclaré vide.
+            var prints = services.CurrentEvent.Info.Stats.Prints;
+            var empty = await PrintAtZeroAsync();
+            await WaitUntil(() => kiosk.PaperQuestion.ShowAnswers, 10, "question « Votre photo est-elle sortie ? »");
+            await Snap(kiosk, paperFolder, "1-question");
+            kiosk.PaperQuestion.NoCommand.Execute(null);
+            await Snap(kiosk, paperFolder, "2-nouvel-essai");
+            await WaitUntil(() => kiosk.PaperQuestion.ShowAnswers, 15, "deuxième question");
+            await Snap(kiosk, paperFolder, "3-deuxieme-question");
+            kiosk.PaperQuestion.NoCommand.Execute(null);
+            await WaitUntil(() => kiosk.PaperQuestion.ShowOk, 5, "message « Plus de papier »");
+            await Snap(kiosk, paperFolder, "4-plus-de-papier");
+            note($"Papier, deux « Non » : rapport = {print.PaperReport}, bouton Imprimer actif = {kiosk.Review.CanPrint}, "
+                 + $"indication « {kiosk.Review.PrintHint} », impressions de l'événement {prints} → {services.CurrentEvent.Info.Stats.Prints}, "
+                 + $"PDF : {string.Join(", ", ListPdfs(empty.Event.DemoPrintsFolder).Where(p => p.Contains(empty.Id)))}");
+            if (print.PaperReport != PaperReport.Empty || kiosk.Review.CanPrint)
+                throw new InvalidOperationException("Le rouleau devrait être déclaré vide et l'impression suspendue");
+            kiosk.PaperQuestion.OkCommand.Execute(null);
+            await Snap(kiosk, paperFolder, "5-revue-plus-de-papier");
+            kiosk.Finish();
+            kiosk.ResumeAfterAdmin();
+            await WaitUntil(() => kiosk.State == KioskState.Attract, 5, "accueil");
+            await Snap(kiosk, paperFolder, "6-accueil-plus-de-papier");
+            note($"Accueil, rouleau vide : « {kiosk.Attract.OperatorWarning} »");
+            await SnapAdminHome("7-admin-accueil-rouleau-vide");
+
+            // 2. Nouveau rouleau (admin), compteur de nouveau à 0, et cette fois « Oui ».
+            services.NewPaperRoll();
+            await services.PrinterMonitor.RefreshAsync();
+            note($"Nouveau rouleau : rapport = {print.PaperReport}, tirages restants = {services.PrinterMonitor.Current.RemainingPrints}");
+            await PrintAtZeroAsync();
+            await WaitUntil(() => kiosk.PaperQuestion.ShowAnswers, 10, "question après le nouveau rouleau");
+            kiosk.PaperQuestion.YesCommand.Execute(null);
+            note($"Papier, « Oui » : rapport = {print.PaperReport}, question encore affichée = {kiosk.PaperQuestion.IsVisible}");
+            if (print.PaperReport != PaperReport.StillPrinting) throw new InvalidOperationException("La réponse « Oui » devrait être retenue");
+            await SnapAdminHome("8-admin-accueil-compteur-a-0-confirme");
+
+            // 3. Après « Oui », plus de question jusqu'au prochain rouleau.
+            await PrintAtZeroAsync();
+            await Task.Delay(2500);
+            note($"Impression suivante, compteur à 0 : question affichée = {kiosk.PaperQuestion.IsVisible} (attendu : non)");
+            if (kiosk.PaperQuestion.IsVisible) throw new InvalidOperationException("Aucune question ne devrait être posée après « Oui »");
+            kiosk.Finish();
+        }
+        finally
+        {
+            KioskViewModel.PaperDelayForCapture = null;
+            print.PrintedSinceMediaChange = savedCount;
+            services.SetPaperReport(savedReport, "fin du parcours de vérification");
+            services.SaveSettings();
+            await services.PrinterMonitor.RefreshAsync();
+            kiosk.ResumeAfterAdmin();
+        }
     }
 
     /// <summary>Les pages de l'admin, dans l'ordre du menu, avec le nom de leur image.</summary>

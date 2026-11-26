@@ -19,6 +19,11 @@ internal static class WinSpool
     private static extern bool EnumJobs(IntPtr hPrinter, int firstJob, int noJobs, int level, IntPtr pJob, int cbBuf, out int pcbNeeded, out int pcReturned);
 
     [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool SetJob(IntPtr hPrinter, uint jobId, int level, IntPtr pJob, uint command);
+
+    private const uint JobControlDelete = 5;
+
+    [DllImport("winspool.drv", CharSet = CharSet.Unicode, SetLastError = true)]
     public static extern int DocumentProperties(IntPtr hwnd, IntPtr hPrinter, string pDeviceName, IntPtr pDevModeOutput, IntPtr pDevModeInput, int fMode);
 
     [StructLayout(LayoutKind.Sequential)]
@@ -125,6 +130,44 @@ internal static class WinSpool
 
                 var state = info.cJobs > 0 ? $"Impression en cours ({info.cJobs} en file)" : "Prête";
                 return new PrinterQueueInfo(true, false, state, (int)info.cJobs, port, driver);
+            }
+            finally
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
+        finally
+        {
+            ClosePrinter(handle);
+        }
+    }
+
+    /// <summary>
+    /// Supprime de la file Windows les travaux dont le nom vérifie <paramref name="match"/> (ceux de LibreBooth). Renvoie
+    /// le nombre de travaux supprimés et ceux qui ont résisté (déjà partis vers l'imprimante, droits insuffisants…).
+    /// </summary>
+    public static (int Cancelled, int Failed) CancelJobs(string printerName, Func<string?, bool> match)
+    {
+        if (!OpenPrinter(printerName, out var handle, IntPtr.Zero)) return (0, 0);
+        try
+        {
+            EnumJobs(handle, 0, 100, 1, IntPtr.Zero, 0, out var needed, out _);
+            if (needed <= 0) return (0, 0);
+            var buffer = Marshal.AllocHGlobal(needed);
+            try
+            {
+                if (!EnumJobs(handle, 0, 100, 1, buffer, needed, out _, out var count)) return (0, 0);
+                var size = Marshal.SizeOf<JobInfo1>();
+                var cancelled = 0;
+                var failed = 0;
+                for (var i = 0; i < count; i++)
+                {
+                    var job = Marshal.PtrToStructure<JobInfo1>(buffer + i * size);
+                    if (!match(Marshal.PtrToStringUni(job.pDocument))) continue;
+                    if (SetJob(handle, job.JobId, 0, IntPtr.Zero, JobControlDelete)) cancelled++;
+                    else failed++;
+                }
+                return (cancelled, failed);
             }
             finally
             {

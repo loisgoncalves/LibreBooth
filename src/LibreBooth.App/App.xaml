@@ -32,6 +32,10 @@
             <DataTemplate DataType="{x:Type kiosk:ErrorViewModel}">
                 <views:ErrorView />
             </DataTemplate>
+            <!-- Par-dessus l'écran en cours : « Votre photo est-elle sortie ? » (compteur de papier à 0) -->
+            <DataTemplate DataType="{x:Type kiosk:PaperQuestionViewModel}">
+                <views:PaperQuestionView />
+            </DataTemplate>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

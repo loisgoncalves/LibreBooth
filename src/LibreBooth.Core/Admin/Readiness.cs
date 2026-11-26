@@ -33,6 +33,9 @@ public sealed record ReadinessItem(ReadinessArea Area, ReadinessLevel Level, str
 {
     /// <summary>Compte dans « N points à vérifier ».</summary>
     public bool NeedsAttention => Level is ReadinessLevel.Warning or ReadinessLevel.Error;
+
+    /// <summary>La ligne propose « J'ai installé un nouveau rouleau » (papier à 0 ou signalé vide, depuis la 3.2.0).</summary>
+    public bool OffersNewRoll { get; init; }
 }
 
 /// <summary>État du booth au moment du calcul, en valeurs simples (l'admin les lit toutes les secondes).</summary>
@@ -62,6 +65,8 @@ public sealed record ReadinessInput
     public string PrinterMessage { get; init; } = "";
     public int? RemainingPrints { get; init; }
     public bool LowMedia { get; init; }
+    /// <summary>Ce qu'ont répondu les invités quand le compteur était à 0 (depuis la 3.2.0).</summary>
+    public PaperReport PaperReport { get; init; }
 
     /// <summary>Noms des formats proposés aux invités pour cet événement.</summary>
     public IReadOnlyList<string> Formats { get; init; } = Array.Empty<string>();
@@ -200,6 +205,8 @@ public static class Readiness
         if (input.PrintToPdf)
         {
             yield return new(ReadinessArea.Printer, ReadinessLevel.Info, title, "Mode essai : les impressions sont enregistrées en PDF.");
+            // Le contrôle du papier par les invités marche aussi en essai : on le montre dès qu'il est en jeu.
+            if (input.PaperReport != PaperReport.None || input.RemainingPrints is <= 0) yield return Paper(input);
             yield break;
         }
         if (string.IsNullOrWhiteSpace(input.PrinterName))
@@ -227,23 +234,38 @@ public static class Readiness
             yield return new(ReadinessArea.Printer, ReadinessLevel.Ok, title, message.Length > 0 ? $"{input.PrinterName} : {message}" : $"{input.PrinterName} prête.");
         }
 
-        const string paper = "Papier";
+        yield return Paper(input);
+    }
+
+    /// <summary>
+    /// Le papier : compteur de la DNP (ou de LibreBooth), et réponses des invités quand il est à 0 (depuis la 3.2.0).
+    /// </summary>
+    private static ReadinessItem Paper(ReadinessInput input)
+    {
+        const string title = "Papier";
+        if (input.PaperReport == PaperReport.Empty)
+        {
+            return new(ReadinessArea.Paper, ReadinessLevel.Error, title,
+                "Plus de papier, signalé par un invité : l'impression est suspendue, les photos sont enregistrées. "
+                + "Changez le rouleau, puis appuyez sur « J'ai installé un nouveau rouleau ».") { OffersNewRoll = true };
+        }
         if (input.RemainingPrints is not { } remaining)
         {
-            yield return new(ReadinessArea.Paper, ReadinessLevel.Info, paper, "Nombre de tirages restants inconnu.");
+            return new(ReadinessArea.Paper, ReadinessLevel.Info, title, "Nombre de tirages restants inconnu.");
         }
-        else if (remaining <= 0)
+        if (remaining <= 0)
         {
-            yield return new(ReadinessArea.Paper, ReadinessLevel.Error, paper, "Plus aucun tirage restant : changez le rouleau.");
+            return input.PaperReport == PaperReport.StillPrinting
+                ? new(ReadinessArea.Paper, ReadinessLevel.Warning, title,
+                    "Compteur à 0, mais un invité a confirmé que sa photo est sortie : les impressions continuent. Prévoyez un rouleau.")
+                    { OffersNewRoll = true }
+                : new(ReadinessArea.Paper, ReadinessLevel.Error, title,
+                    "Compteur à 0 : changez le rouleau. Sinon, le photobooth demandera au prochain invité si sa photo est sortie.")
+                    { OffersNewRoll = true };
         }
-        else if (input.LowMedia)
-        {
-            yield return new(ReadinessArea.Paper, ReadinessLevel.Warning, paper, $"{Prints(remaining)} : prévoyez un rouleau de rechange.");
-        }
-        else
-        {
-            yield return new(ReadinessArea.Paper, ReadinessLevel.Ok, paper, $"{Prints(remaining)}.");
-        }
+        return input.LowMedia
+            ? new(ReadinessArea.Paper, ReadinessLevel.Warning, title, $"{Prints(remaining)} : prévoyez un rouleau de rechange.")
+            : new(ReadinessArea.Paper, ReadinessLevel.Ok, title, $"{Prints(remaining)}.");
     }
 
     private static string Prints(int remaining) => remaining <= 1 ? $"{remaining} tirage restant" : $"{remaining} tirages restants";

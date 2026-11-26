@@ -183,6 +183,12 @@ lui-même. Si vous réglez un format à la main (« Réglages du pilote… »), 
   caché `.librebooth`. Les événements des versions 1.x sont convertis au premier lancement de la 2.0.0, sans perdre
   une photo.
 - **Réimprimer** une photo : admin › Événement › Galerie.
+- **Papier** : le nombre de tirages restants vient de la DNP (avec `cspstat.dll`), sinon d'un compteur de LibreBooth
+  qui suppose que vous appuyez sur « J'ai installé un nouveau rouleau » à chaque changement. Quand il est à 0,
+  l'impression part quand même et le photobooth demande à l'invité si sa photo est sortie. « Oui » : on continue sans
+  redemander jusqu'au prochain rouleau. « Non » : un nouvel essai, puis, si rien ne sort, « Plus de papier » : le
+  bouton « Imprimer » est grisé, les photos continuent d'être enregistrées, et l'accueil de l'admin propose « J'ai
+  installé un nouveau rouleau ».
 - **Espace disque** : gardez au moins **2 Go** libres sur le disque des photos (environ 170 sessions). En dessous,
   « Démarrer le photobooth » prévient, et l'on peut démarrer quand même. Sous **300 Mo**, le photobooth ne lance plus
   de session : son accueil affiche « Le photobooth fait une pause » et prévient l'animateur. Videz la corbeille de

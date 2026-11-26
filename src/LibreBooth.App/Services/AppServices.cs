@@ -50,6 +50,7 @@ public sealed class AppServices : IDisposable
         Printer = new WindowsPrinterService();
         AutoConfigurePrinter();
         PrinterMonitor = new PrinterMonitor(this);
+        PrinterMonitor.Changed += (_, _) => ForgetPaperReportIfRefilled();
         Camera = CreateCamera();
         SaveSettings();
     }
@@ -406,6 +407,90 @@ public sealed class AppServices : IDisposable
         SaveSettings();
         PrinterMonitor.RefreshSoon();
         _log.Information("Impression : {Copies} × {File} sur {Printer}", copies, Path.GetFileName(compositePath), printerName);
+    }
+
+    // ---------------------------------------------------------------- Papier vérifié par les invités (3.2.0)
+
+    /// <summary>Les réponses des invités ont changé (question à 0, nouveau rouleau) : écrans et admin se mettent à jour.</summary>
+    public event EventHandler? PaperReportChanged;
+
+    /// <summary>Rouleau déclaré vide par un invité : le bouton « Imprimer » est grisé jusqu'au nouveau rouleau.</summary>
+    public bool PaperDeclaredEmpty => PaperCheck.BlocksPrinting(Settings.Print.PaperReport);
+
+    public void SetPaperReport(PaperReport report, string reason)
+    {
+        if (Settings.Print.PaperReport == report) return;
+        _log.Information("Papier : {Old:l} → {New:l} ({Reason:l})", Settings.Print.PaperReport.ToString(), report.ToString(), reason);
+        Settings.Print.PaperReport = report;
+        SaveSettings();
+        PaperReportChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Nouvel essai demandé par l'invité dont la photo n'est pas sortie : un exemplaire, qui ne compte pas dans les
+    /// statistiques (la première impression y est déjà).
+    /// </summary>
+    public async Task PrintPaperRetryAsync(BoothEvent ev, string sessionId, string compositePath, string profile)
+    {
+        var printerName = EffectivePrinterName;
+        if (string.IsNullOrWhiteSpace(printerName)) throw new PrinterException("Aucune imprimante choisie (admin > Impression).");
+
+        string? pdf = null;
+        if (Options.PrintToPdf)
+        {
+            Directory.CreateDirectory(ev.DemoPrintsFolder);
+            pdf = Path.Combine(ev.DemoPrintsFolder, $"{sessionId}_{DateTime.Now:HHmmss}_nouvel-essai.pdf");
+        }
+        var request = new PrintJobRequest(compositePath, printerName, DriverSettingsFor(profile), 1,
+            $"{PaperCheck.JobNamePrefix} {sessionId} (nouvel essai)", pdf, FitWholeImage: Options.PrintToPdf);
+        await Printer.PrintAsync(request).ConfigureAwait(true);
+        PrinterMonitor.RefreshSoon();
+        _log.Information("Papier : nouvel essai d'impression de {File} sur {Printer}", Path.GetFileName(compositePath), printerName);
+    }
+
+    /// <summary>
+    /// Rien n'est sorti, même au nouvel essai : rouleau déclaré vide. L'impression de l'invité ne compte plus (elle n'est
+    /// pas sortie), et les impressions de LibreBooth encore en file sont annulées, pour ne pas sortir d'un coup au
+    /// nouveau rouleau.
+    /// </summary>
+    public void DeclarePaperEmpty(BoothEvent ev, string sessionId, int copiesNotPrinted)
+    {
+        SetPaperReport(PaperReport.Empty, "rien n'est sorti, même au nouvel essai");
+        if (copiesNotPrinted > 0)
+        {
+            try
+            {
+                Events.UpdateStats(ev, s => s.Prints = Math.Max(0, s.Prints - copiesNotPrinted));
+                Events.UpdateSession(ev, sessionId, r => r.Prints = Math.Max(0, r.Prints - copiesNotPrinted));
+            }
+            catch (Exception ex)
+            {
+                _log.Warning(ex, "Statistiques d'impression non corrigées");
+            }
+        }
+        var printer = EffectivePrinterName;
+        if (!string.IsNullOrWhiteSpace(printer)) Printer.CancelLibreBoothJobs(printer);
+        PrinterMonitor.RefreshSoon(TimeSpan.FromSeconds(1));
+    }
+
+    /// <summary>« J'ai installé un nouveau rouleau » (admin) : compteur de LibreBooth à zéro, réponses des invités oubliées.</summary>
+    public void NewPaperRoll()
+    {
+        Settings.Print.PrintedSinceMediaChange = 0;
+        SaveSettings();
+        _log.Information("Nouveau rouleau installé : compteur de LibreBooth remis à zéro");
+        SetPaperReport(PaperReport.None, "nouveau rouleau");
+        _ = PrinterMonitor.RefreshAsync();
+    }
+
+    /// <summary>Le compteur est remonté au-dessus de 0 (nouveau rouleau lu par la DNP…) : les réponses des invités ne valent plus.</summary>
+    private void ForgetPaperReportIfRefilled()
+    {
+        var remaining = PrinterMonitor.Current.RemainingPrints;
+        if (PaperCheck.ShouldForget(remaining, Settings.Print.PaperReport))
+        {
+            SetPaperReport(PaperReport.None, $"le compteur indique de nouveau {remaining} tirages");
+        }
     }
 
     // ---------------------------------------------------------------- Réglages

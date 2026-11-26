@@ -211,6 +211,41 @@ public partial class ReviewViewModel : ObservableObject
     private void Finish() => _kiosk.Finish();
 }
 
+/// <summary>
+/// Question posée par-dessus l'écran quand le compteur de papier est à 0 (depuis la 3.2.0) : « Votre photo est-elle
+/// sortie ? », puis le nouvel essai et, si rien ne sort, le message « Plus de papier ».
+/// </summary>
+public partial class PaperQuestionViewModel : ObservableObject
+{
+    private readonly Action<bool> _answer;
+    private readonly Action _close;
+
+    public PaperQuestionViewModel(Action<bool> answer, Action close)
+    {
+        _answer = answer;
+        _close = close;
+    }
+
+    [ObservableProperty] private bool _isVisible;
+    [ObservableProperty] private string _title = "";
+    [ObservableProperty] private string? _message;
+    /// <summary>Boutons « Oui » et « Non ».</summary>
+    [ObservableProperty] private bool _showAnswers;
+    /// <summary>Bouton « OK » (message final).</summary>
+    [ObservableProperty] private bool _showOk;
+    /// <summary>Roue d'attente pendant le nouvel essai.</summary>
+    [ObservableProperty] private bool _isBusy;
+
+    [RelayCommand]
+    private void Yes() => _answer(true);
+
+    [RelayCommand]
+    private void No() => _answer(false);
+
+    [RelayCommand]
+    private void Ok() => _close();
+}
+
 public partial class ThanksViewModel : ObservableObject
 {
     [ObservableProperty] private string _title = "Merci !";

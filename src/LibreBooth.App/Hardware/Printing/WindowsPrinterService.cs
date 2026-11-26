@@ -43,6 +43,22 @@ internal sealed class WindowsPrinterService : IPrinterService
         }
     }
 
+    public int CancelLibreBoothJobs(string printerName)
+    {
+        try
+        {
+            var (cancelled, failed) = WinSpool.CancelJobs(printerName, PaperCheck.IsLibreBoothJob);
+            _log.Information("File Windows de {Printer} : {Cancelled} impression(s) de LibreBooth annulée(s){Failed}",
+                printerName, cancelled, failed > 0 ? $", {failed} impossible(s) à annuler" : "");
+            return cancelled;
+        }
+        catch (Exception ex)
+        {
+            _log.Warning(ex, "Impressions en attente non annulées sur {Printer}", printerName);
+            return 0;
+        }
+    }
+
     public Task PrintAsync(PrintJobRequest request, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

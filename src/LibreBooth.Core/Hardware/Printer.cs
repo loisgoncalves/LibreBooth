@@ -26,6 +26,12 @@ public interface IPrinterService
     IReadOnlyList<string> GetInstalledPrinters();
     Task PrintAsync(PrintJobRequest request, CancellationToken cancellationToken = default);
     PrinterQueueInfo GetQueueInfo(string printerName);
+
+    /// <summary>
+    /// Annule les impressions de LibreBooth encore dans la file Windows (rouleau déclaré vide, depuis la 3.2.0) : elles
+    /// ne sortiront pas d'un coup au nouveau rouleau. Renvoie le nombre de travaux annulés.
+    /// </summary>
+    int CancelLibreBoothJobs(string printerName);
 }
 
 public enum PrinterCondition

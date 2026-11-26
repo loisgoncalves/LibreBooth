@@ -16,6 +16,8 @@
         <Viewbox Stretch="Uniform">
             <Grid Width="1920" Height="1080" ClipToBounds="True">
                 <ContentControl Content="{Binding CurrentScreen}" Focusable="False" />
+                <ContentControl Content="{Binding PaperQuestion}" Focusable="False"
+                                Visibility="{Binding PaperQuestion.IsVisible, Converter={StaticResource BoolToVisibility}}" />
             </Grid>
         </Viewbox>
 

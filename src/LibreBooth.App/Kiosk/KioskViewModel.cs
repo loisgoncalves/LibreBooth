@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using LibreBooth.App.Infrastructure;
 using LibreBooth.App.Services;
 using LibreBooth.Core.Admin;
+using LibreBooth.Core.Config;
 using LibreBooth.Core.Events;
 using LibreBooth.Core.Hardware;
 using LibreBooth.Core.Layouts;
@@ -32,6 +33,16 @@ public sealed partial class KioskViewModel : ObservableObject
     private bool _paused;
     private bool _diskFull;
 
+    // Papier vérifié par l'invité quand le compteur est à 0 (3.2.0) : l'étape en cours et l'impression concernée.
+    private enum PaperStep { None, WaitingFirst, AskingFirst, WaitingRetry, AskingRetry, Notice }
+    private sealed record PaperPrint(SessionData Session, string Composite, string Profile, int Copies);
+    private readonly DispatcherTimer _paperTimer;
+    private PaperStep _paperStep;
+    private PaperPrint? _paperPrint;
+
+    /// <summary>Attente avant la question sur le papier, raccourcie par le parcours de vérification (--captures).</summary>
+    internal static TimeSpan? PaperDelayForCapture { get; set; }
+
     [ObservableProperty] private object? _currentScreen;
 
     public KioskViewModel(AppServices services)
@@ -46,6 +57,14 @@ public sealed partial class KioskViewModel : ObservableObject
         Review = new ReviewViewModel(this);
         Thanks = new ThanksViewModel();
         Error = new ErrorViewModel(() => _machine.Reset());
+        PaperQuestion = new PaperQuestionViewModel(AnswerPaperQuestion, ClosePaperQuestion);
+
+        _paperTimer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher);
+        _paperTimer.Tick += (_, _) =>
+        {
+            _paperTimer.Stop();
+            OnPaperTimer();
+        };
 
         _inactivityTimer = new DispatcherTimer(DispatcherPriority.Normal, _dispatcher);
         _inactivityTimer.Tick += (_, _) =>
@@ -63,6 +82,7 @@ public sealed partial class KioskViewModel : ObservableObject
         services.CameraChanged += (_, _) => _dispatcher.BeginInvoke(AttachCamera);
         services.EventChanged += (_, _) => _dispatcher.BeginInvoke(RefreshFromSettings);
         services.PrinterMonitor.Changed += (_, _) => RefreshOperatorWarning();
+        services.PaperReportChanged += (_, _) => RefreshOperatorWarning();
 
         AttachCamera();
         RefreshFromSettings();
@@ -76,6 +96,8 @@ public sealed partial class KioskViewModel : ObservableObject
     public ReviewViewModel Review { get; }
     public ThanksViewModel Thanks { get; }
     public ErrorViewModel Error { get; }
+    /// <summary>« Votre photo est-elle sortie ? », par-dessus l'écran en cours (compteur de papier à 0).</summary>
+    public PaperQuestionViewModel PaperQuestion { get; }
 
     public KioskState State => _machine.State;
     public SessionData? CurrentSession => _session;
@@ -163,11 +185,21 @@ public sealed partial class KioskViewModel : ObservableObject
         {
             Attract.OperatorWarning = null;
         }
+        else if (_services.PaperDeclaredEmpty)
+        {
+            Attract.OperatorWarning = "Plus de papier (signalé par un invité) : changez le rouleau, puis admin › « J'ai installé un nouveau rouleau »";
+        }
         else if (!health.CanPrint && health.Condition != PrinterCondition.Unknown)
         {
             Attract.OperatorWarning = health.Message.StartsWith("Imprimante", StringComparison.OrdinalIgnoreCase)
                 ? health.Message
                 : "Imprimante : " + health.Message;
+        }
+        else if (health.RemainingPrints is <= 0)
+        {
+            Attract.OperatorWarning = settings.PaperReport == PaperReport.StillPrinting
+                ? "Compteur de papier à 0, mais les tirages sortent encore : prévoyez un rouleau"
+                : "Compteur de papier à 0 : changez le rouleau si possible";
         }
         else if (health.LowMedia)
         {
@@ -208,6 +240,9 @@ public sealed partial class KioskViewModel : ObservableObject
             KioskState.Error => Error,
             _ => Attract,
         };
+
+        // Un nouvel invité commence : la question sur le papier, restée sans réponse, sera posée à la prochaine impression.
+        if (e.Current == KioskState.ChooseTemplate && _paperStep != PaperStep.None) DropPaperCheck("un nouvel invité commence");
 
         var screens = _services.Settings.Screens;
         switch (e.Current)
@@ -465,12 +500,19 @@ public sealed partial class KioskViewModel : ObservableObject
         Review.ShowPrintButton = print.Enabled;
         Review.MaxCopies = Math.Max(1, allowed);
         if (Review.Copies > Review.MaxCopies) Review.Copies = Review.MaxCopies;
-        Review.ShowCopiesSelector = print.Enabled && allowed > 1;
+
+        var paperEmpty = _services.PaperDeclaredEmpty;
+        Review.ShowCopiesSelector = print.Enabled && allowed > 1 && !paperEmpty;
 
         if (!print.Enabled)
         {
             Review.CanPrint = false;
             Review.PrintHint = null;
+        }
+        else if (paperEmpty)
+        {
+            Review.CanPrint = false;
+            Review.PrintHint = "Plus de papier : vos photos sont bien enregistrées, l'animateur va changer le rouleau.";
         }
         else if (allowed <= 0)
         {
@@ -545,6 +587,8 @@ public sealed partial class KioskViewModel : ObservableObject
         if (!Review.CanPrint) return;
 
         copies = Math.Clamp(copies, 1, Review.MaxCopies);
+        // Compteur de papier avant l'impression : à 0, elle part quand même, puis on demande à l'invité si elle est sortie.
+        var remainingBefore = _services.PrinterMonitor.Current.RemainingPrints;
         Review.IsPrinting = true;
         Review.ShowRetakeButton = false;
         Review.StatusMessage = "Impression en cours…";
@@ -558,6 +602,10 @@ public sealed partial class KioskViewModel : ObservableObject
                 : copies > 1
                     ? $"{copies} impressions lancées ! Elles arrivent dans quelques secondes."
                     : "Impression lancée ! Elle arrive dans quelques secondes.";
+            if (_paperStep == PaperStep.None && PaperCheck.ShouldAsk(remainingBefore, _services.Settings.Print.PaperReport))
+            {
+                StartPaperCheck(new PaperPrint(session, session.CompositePath, session.Template.Layout.PrintProfile, copies));
+            }
         }
         catch (Exception ex)
         {
@@ -572,6 +620,159 @@ public sealed partial class KioskViewModel : ObservableObject
         }
     }
 
+    // ---------------------------------------------------------------- Papier vérifié par l'invité (3.2.0)
+
+    /// <summary>Le compteur était à 0 : on laisse le temps à l'impression de sortir, puis on pose la question.</summary>
+    private void StartPaperCheck(PaperPrint print)
+    {
+        _paperPrint = print;
+        _paperStep = PaperStep.WaitingFirst;
+        var delay = PaperCheck.QuestionDelay(print.Copies);
+        _log.Information("Compteur de papier à 0 : impression envoyée quand même ({Copies} ex.), question à l'invité dans {Seconds} s",
+            print.Copies, (int)delay.TotalSeconds);
+        StartPaperTimer(PaperDelayForCapture ?? delay);
+    }
+
+    private void StartPaperTimer(TimeSpan delay)
+    {
+        _paperTimer.Stop();
+        _paperTimer.Interval = delay;
+        _paperTimer.Start();
+    }
+
+    private void OnPaperTimer()
+    {
+        switch (_paperStep)
+        {
+            case PaperStep.WaitingFirst or PaperStep.WaitingRetry:
+                // Seulement sur la revue, la fin ou l'accueil, et pour la session concernée (pas pendant la photo d'un autre).
+                var screenFree = _machine.State is KioskState.Review or KioskState.Thanks or KioskState.Attract;
+                if (_paused || !screenFree || (_session != null && _session != _paperPrint?.Session))
+                {
+                    DropPaperCheck("l'écran est occupé par un autre invité");
+                    return;
+                }
+                var retry = _paperStep == PaperStep.WaitingRetry;
+                _paperStep = retry ? PaperStep.AskingRetry : PaperStep.AskingFirst;
+                ShowPaper(retry ? "Et cette fois, votre photo est-elle sortie ?" : "Votre photo est-elle sortie de l'imprimante ?",
+                    retry
+                        ? "Nous venons de la réimprimer."
+                        : "Le rouleau de papier est peut-être terminé : dites-nous si vous avez bien reçu votre photo.",
+                    answers: true);
+                _log.Information("Question à l'invité : sa photo est-elle sortie ?{Retry}", retry ? " (après le nouvel essai)" : "");
+                StartPaperTimer(PaperCheck.AnswerTimeout);
+                break;
+            case PaperStep.AskingFirst or PaperStep.AskingRetry:
+                DropPaperCheck("pas de réponse");
+                break;
+            case PaperStep.Notice:
+                ClosePaperQuestion();
+                break;
+        }
+    }
+
+    /// <summary>« Oui » ou « Non » de l'invité.</summary>
+    private void AnswerPaperQuestion(bool printed)
+    {
+        var print = _paperPrint;
+        if (print == null || _paperStep is not (PaperStep.AskingFirst or PaperStep.AskingRetry)) return;
+        _paperTimer.Stop();
+        NotifyActivity();
+
+        if (printed)
+        {
+            _services.SetPaperReport(PaperReport.StillPrinting,
+                _paperStep == PaperStep.AskingRetry ? "photo sortie au nouvel essai" : "un invité a confirmé que sa photo est sortie");
+            ClosePaperQuestion();
+            return;
+        }
+
+        if (_paperStep == PaperStep.AskingFirst)
+        {
+            _log.Information("L'invité dit que sa photo n'est pas sortie : nouvel essai");
+            _ = RetryPaperPrintAsync(print);
+            return;
+        }
+
+        _log.Warning("Rien n'est sorti, même au nouvel essai : rouleau déclaré vide");
+        _services.DeclarePaperEmpty(print.Session.Event, print.Session.Id, print.Copies);
+        if (_machine.State == KioskState.Review && _session == print.Session) Review.StatusMessage = null;
+        UpdateReviewPrintState();
+        ShowNotice("Plus de papier",
+            "Votre photo est bien enregistrée : l'animateur va changer le rouleau et pourra ensuite vous l'imprimer.");
+    }
+
+    /// <summary>« Non » à la première question : la photo de l'invité est réimprimée une fois.</summary>
+    private async Task RetryPaperPrintAsync(PaperPrint print)
+    {
+        var health = _services.PrinterMonitor.Current;
+        if (!health.CanPrint && health.Condition != PrinterCondition.Unknown)
+        {
+            // L'imprimante signale elle-même un problème (capot, bourrage…) : pas de nouvel essai, le rouleau n'est pas en cause.
+            _log.Information("Pas de nouvel essai : l'imprimante signale « {Message} »", health.Message);
+            ShowNotice("L'imprimante a un problème", "Votre photo est bien enregistrée : prévenez l'animateur.");
+            return;
+        }
+
+        _paperStep = PaperStep.WaitingRetry;
+        ShowPaper("Nous réimprimons votre photo…", "Patientez quelques secondes devant l'imprimante.", busy: true);
+        try
+        {
+            await _services.PrintPaperRetryAsync(print.Session.Event, print.Session.Id, print.Composite, print.Profile);
+        }
+        catch (Exception ex)
+        {
+            _log.Error(ex, "Nouvel essai d'impression impossible");
+            if (_paperStep == PaperStep.WaitingRetry)
+            {
+                ShowNotice("L'impression n'a pas pu être relancée", "Votre photo est bien enregistrée : prévenez l'animateur.");
+            }
+            return;
+        }
+        if (_paperStep != PaperStep.WaitingRetry) return; // abandonné entre-temps (admin ouverte, nouvel invité)
+        StartPaperTimer(PaperDelayForCapture ?? PaperCheck.QuestionDelay(1));
+    }
+
+    private void ShowPaper(string title, string? message, bool answers = false, bool busy = false, bool ok = false)
+    {
+        PaperQuestion.Title = title;
+        PaperQuestion.Message = message;
+        PaperQuestion.ShowAnswers = answers;
+        PaperQuestion.IsBusy = busy;
+        PaperQuestion.ShowOk = ok;
+        PaperQuestion.IsVisible = true;
+    }
+
+    /// <summary>Message final (bouton « OK »), qui disparaît seul au bout de quelques secondes.</summary>
+    private void ShowNotice(string title, string message)
+    {
+        _paperStep = PaperStep.Notice;
+        ShowPaper(title, message, ok: true);
+        StartPaperTimer(PaperCheck.EmptyNoticeDuration);
+    }
+
+    private void ClosePaperQuestion()
+    {
+        _paperTimer.Stop();
+        _paperStep = PaperStep.None;
+        _paperPrint = null;
+        PaperQuestion.IsVisible = false;
+        PaperQuestion.ShowAnswers = false;
+        PaperQuestion.ShowOk = false;
+        PaperQuestion.IsBusy = false;
+    }
+
+    /// <summary>Question abandonnée sans réponse : rien ne change, elle sera posée à la prochaine impression.</summary>
+    private void DropPaperCheck(string reason)
+    {
+        if (_paperStep is PaperStep.None) return;
+        if (_paperStep is not PaperStep.Notice)
+        {
+            _log.Information("Question sur le papier abandonnée ({Reason}) : elle sera posée à la prochaine impression", reason);
+        }
+        ClosePaperQuestion();
+    }
+
     // ---------------------------------------------------------------- Fin
 
     public void Finish() => _machine.Finish();
@@ -582,6 +783,7 @@ public sealed partial class KioskViewModel : ObservableObject
     {
         _paused = true;
         OnPropertyChanged(nameof(IsIdle));
+        DropPaperCheck("admin ouverte");
         _inactivityTimer.Stop();
         _sessionCancellation?.Cancel();
         await SafeStopLiveViewAsync();

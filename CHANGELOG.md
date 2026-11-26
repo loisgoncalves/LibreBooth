@@ -6,6 +6,24 @@ même. La version installée s'affiche dans l'admin › Système.
 Numéro majeure.fonction.correctif : **majeure** quand les habitudes ou les fichiers de l'utilisateur changent,
 **fonction** pour une nouveauté, **correctif** pour une correction (voir le README, « Numéros de version »).
 
+## 3.2.0 – 26/11/2026
+
+Le compteur de papier peut se tromper : à 0, le photobooth n'arrête plus rien sans avoir demandé à l'invité.
+
+- **Compteur à 0** : l'impression part quand même, puis l'écran demande à l'invité « Votre photo est-elle sortie de
+  l'imprimante ? ».
+- **« Oui »** : les impressions continuent, sans autre question jusqu'au prochain rouleau. L'accueil de l'admin le
+  signale en orange (« un invité a confirmé que sa photo est sortie »).
+- **« Non »** : sa photo est réimprimée une fois, puis la question revient. Si rien ne sort encore, le rouleau est
+  déclaré vide : « Plus de papier » à l'écran, bouton « Imprimer » grisé pour les invités suivants, photos toujours
+  prises et enregistrées. Les impressions de LibreBooth restées dans la file Windows sont annulées, pour ne pas sortir
+  d'un coup au nouveau rouleau ; l'impression non sortie ne compte plus dans les statistiques.
+- **Nouveau rouleau** : « J'ai installé un nouveau rouleau » (admin › Impression, et désormais aussi sur la ligne
+  Papier de l'accueil de l'admin) remet le compteur à zéro et relance les impressions. Si le compteur de la DNP
+  remonte tout seul (rouleau neuf détecté), les réponses des invités sont oubliées de la même façon.
+- **Sans réponse** (invité parti, nouvel invité qui commence, admin ouverte) : rien ne change, la question sera posée
+  à la prochaine impression.
+
 ## 3.1.0 – 24/11/2026
 
 Plus besoin du SDK Canon : LibreBooth pilote l'appareil photo par le pilote intégré à Windows.

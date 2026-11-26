@@ -352,6 +352,7 @@ public partial class AdminWindow : Window
             PrinterMessage = health.Message,
             RemainingPrints = health.RemainingPrints,
             LowMedia = health.LowMedia,
+            PaperReport = settings.Print.PaperReport,
             Formats = _formatNames,
             EventPrints = _services.CurrentEvent.Info.Stats.Prints,
             EventPrintLimit = settings.Print.EventPrintLimit,
@@ -435,10 +436,12 @@ public partial class AdminWindow : Window
         };
     }
 
-    private string PaperChipLabel() => _services.PrinterMonitor.Current.RemainingPrints switch
+    private string PaperChipLabel() => _services.Settings.Print.PaperReport == PaperReport.Empty
+        ? "Papier épuisé"
+        : _services.PrinterMonitor.Current.RemainingPrints switch
     {
         null => "Papier : inconnu",
-        <= 0 => "Papier épuisé",
+        <= 0 => "Papier : compteur à 0",
         1 => "Papier : 1 tirage",
         var remaining => $"Papier : {remaining} tirages",
     };
@@ -941,12 +944,12 @@ public partial class AdminWindow : Window
         UpdatePrinterTexts();
     }
 
+    /// <summary>« J'ai installé un nouveau rouleau » (page Impression ou ligne Papier de l'accueil).</summary>
     private void NewRoll_Click(object sender, RoutedEventArgs e)
     {
-        _services.Settings.Print.PrintedSinceMediaChange = 0;
-        _services.SaveSettings();
-        _ = _services.PrinterMonitor.RefreshAsync();
+        _services.NewPaperRoll();
         UpdatePrinterTexts();
+        UpdateReadiness();
     }
 
     private void UpdatePrinterTexts()
@@ -965,9 +968,15 @@ public partial class AdminWindow : Window
             brush = health.CanPrint ? "Admin.Success" : _services.Settings.Print.Enabled ? "Admin.Error" : "Admin.TextMuted";
         }
         PrinterStateText.SetResourceReference(TextBlock.ForegroundProperty, brush);
-        RemainingText.Text = health.RemainingPrints is int remaining
-            ? $"Tirages restants : {remaining}" + (health.LowMedia ? " — bientôt terminé !" : "")
-            : "Tirages restants : inconnu";
+        RemainingText.Text = (health.RemainingPrints is int remaining
+                                 ? $"Tirages restants : {remaining}" + (health.LowMedia ? " — bientôt terminé !" : "")
+                                 : "Tirages restants : inconnu")
+                             + _services.Settings.Print.PaperReport switch
+                             {
+                                 PaperReport.Empty => " — rouleau signalé vide par un invité",
+                                 PaperReport.StillPrinting => " — un invité a confirmé que les tirages sortent encore",
+                                 _ => "",
+                             };
         PrinterDetailsText.Text = string.IsNullOrEmpty(health.Details) ? "" : $"{health.Details} (vérifié à {health.CheckedAt:HH:mm:ss})";
         MediaCounterText.Text = $"Impressions depuis le dernier changement de rouleau : {_services.Settings.Print.PrintedSinceMediaChange}";
     }
@@ -1292,6 +1301,9 @@ public sealed record ReadinessRow(ReadinessItem Item, AdminPage Page, string Pag
     public string? PageName => Item.Level == ReadinessLevel.Ok ? null : PageLabel;
 
     public string ActionName => $"{Item.Title} : ouvrir la page {PageLabel}";
+
+    /// <summary>Bouton « J'ai installé un nouveau rouleau » sur la ligne Papier (null : pas de bouton).</summary>
+    public string? NewRollLabel => Item.OffersNewRoll ? "J'ai installé un nouveau rouleau" : null;
 
     public static ReadinessRow For(ReadinessItem item) => item.Area switch
     {

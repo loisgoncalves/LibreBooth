@@ -24,6 +24,20 @@ public enum AdminAppearance
     Dark,
 }
 
+/// <summary>
+/// Ce qu'ont répondu les invités quand le compteur de tirages était à 0 (depuis la 3.2.0 ; une version plus ancienne
+/// ignore ce réglage). Voir <see cref="LibreBooth.Core.Hardware.PaperCheck"/>.
+/// </summary>
+public enum PaperReport
+{
+    /// <summary>Rien de signalé : le compteur fait foi.</summary>
+    None,
+    /// <summary>Compteur à 0, mais un invité a confirmé que sa photo est sortie : plus de question jusqu'au prochain rouleau.</summary>
+    StillPrinting,
+    /// <summary>Deux « Non » d'un invité : rouleau vide, impression suspendue jusqu'au nouveau rouleau.</summary>
+    Empty,
+}
+
 /// <summary>Tous les réglages de LibreBooth, enregistrés dans config.json.</summary>
 public sealed class AppSettings
 {
@@ -66,6 +80,7 @@ public sealed class AppSettings
         Print.LowMediaWarning = Math.Clamp(Print.LowMediaWarning, 0, 500);
         Print.MediaCapacity = Math.Clamp(Print.MediaCapacity, 1, 5000);
         Print.PrintedSinceMediaChange = Math.Max(0, Print.PrintedSinceMediaChange);
+        if (!Enum.IsDefined(Print.PaperReport)) Print.PaperReport = PaperReport.None;
 
         Screens.CountdownSeconds = Math.Clamp(Screens.CountdownSeconds, 1, 10);
         Screens.PreviewMilliseconds = Math.Clamp(Screens.PreviewMilliseconds, 300, 5000);
@@ -116,6 +131,11 @@ public sealed class PrintSettings
     /// <summary>Compteur logiciel (si le statut DNP est indisponible) : capacité du rouleau.</summary>
     public int MediaCapacity { get; set; } = 700;
     public int PrintedSinceMediaChange { get; set; }
+    /// <summary>
+    /// Réponse des invités quand le compteur est à 0. Effacée par « J'ai installé un nouveau rouleau », ou dès que le
+    /// compteur remonte au-dessus de 0.
+    /// </summary>
+    public PaperReport PaperReport { get; set; }
     /// <summary>Réglages du pilote Windows (DEVMODE en base64) par profil d'impression.</summary>
     public Dictionary<string, string> DriverSettings { get; set; } = new();
 }
