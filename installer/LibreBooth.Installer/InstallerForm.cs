@@ -51,7 +51,7 @@ internal sealed class InstallerForm : Form
         _folderBox.Text = options.InstallDir;
         _verifyExistingButton.Visible = Installation.VerifyShortcutPath(options.TestMode, options.InstallDir) != null;
 
-        var layout = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Fill };
+        var layout = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
         if (options.Update)
         {
             // Mise à jour lancée depuis l'admin : rien à choisir, elle démarre toute seule.
@@ -72,11 +72,10 @@ internal sealed class InstallerForm : Form
         layout.Controls.Add(_status);
         layout.Controls.Add(_verifyCheck);
         layout.Controls.Add(_launchCheck);
-        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Right, Margin = new Padding(0, 14, 0, 0) };
+        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 14, 0, 0) };
         buttons.Controls.Add(_cancelButton);
         buttons.Controls.Add(_installButton);
-        layout.Controls.Add(buttons);
-        Controls.Add(layout);
+        FormParts.Arrange(this, layout, buttons);
 
         AcceptButton = _installButton;
         CancelButton = _cancelButton;

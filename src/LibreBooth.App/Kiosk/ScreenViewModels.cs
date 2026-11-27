@@ -203,7 +203,7 @@ public partial class ReviewViewModel : ObservableObject
     private bool CanDecreaseCopies() => Copies > 1;
 
     [RelayCommand(CanExecute = nameof(CanPrintNow))]
-    private Task Print() => _kiosk.PrintCurrentAsync(Copies);
+    private Task Print() => _kiosk.PrintFromReviewAsync(Copies);
 
     private bool CanPrintNow() => CanPrint && !IsPrinting;
 

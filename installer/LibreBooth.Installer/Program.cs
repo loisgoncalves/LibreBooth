@@ -18,7 +18,8 @@ namespace LibreBooth.Installer;
 /// /mise-a-jour (lancé par l'admin de LibreBooth : attend sa fermeture, puis remplace la version installée).
 /// Désinstallation : /tout-supprimer (réglages, modèles, personnalisations, pilotes ajoutés, journaux),
 /// /avec-photos (en plus, les photos de tous les événements), /donnees &lt;dossier&gt; (dossier de données à la place
-/// de ceux du profil Windows, pour les essais).
+/// de ceux du profil Windows, pour les essais). Essais de la fenêtre : /apercu &lt;image.png&gt;, et /ecran 1024x600 pour
+/// simuler un petit écran.
 /// </summary>
 internal static class Program
 {
@@ -36,6 +37,8 @@ internal static class Program
         var preview = ValueOf(args, "/apercu");
         var dataFolder = ValueOf(args, "/donnees");
         var withPhotos = HasFlag(args, "/avec-photos");
+        // Essai sur un petit écran simulé (avec /apercu ou /test) : /ecran 1024x600.
+        if ((preview != null || test) && ParseSize(ValueOf(args, "/ecran")) is { } screen) FormParts.ScreenForTests = screen;
         var requested = new UninstallChoices { RemoveAppData = withPhotos || HasFlag(args, "/tout-supprimer"), RemovePhotos = withPhotos };
 
         try
@@ -238,6 +241,16 @@ internal static class Program
                 "LibreBooth", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return 2;
         }
+    }
+
+    /// <summary>« 1024x600 » → 1024 × 600 pixels.</summary>
+    private static Size? ParseSize(string? text)
+    {
+        var parts = text?.Split('x', 'X');
+        return parts is { Length: 2 } && int.TryParse(parts[0], out var width) && int.TryParse(parts[1], out var height)
+               && width >= 200 && height >= 200
+            ? new Size(width, height)
+            : null;
     }
 
     private static bool HasFlag(string[] args, string flag) => args.Any(a => string.Equals(a, flag, StringComparison.OrdinalIgnoreCase));

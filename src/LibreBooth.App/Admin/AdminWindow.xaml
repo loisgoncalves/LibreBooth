@@ -559,7 +559,7 @@
                                 <infra:SettingRow Title="Revue de la photo" Description="Écran où l'invité imprime ou recommence.">
                                     <TextBox Width="100" Margin="0" Text="{Binding Screens.ReviewTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
                                 </infra:SettingRow>
-                                <infra:SettingRow Title="Écran de fin" Description="« Merci ! », après la photo.">
+                                <infra:SettingRow Title="Écran de fin" Description="« Merci ! », dès que l'invité appuie sur « Imprimer » ou « Terminer », puis l'accueil pour l'invité suivant.">
                                     <TextBox Width="100" Margin="0" Text="{Binding Screens.ThanksSeconds, UpdateSourceTrigger=PropertyChanged}" />
                                 </infra:SettingRow>
                                 <infra:SettingRow Title="Écran d'erreur" Description="Quand l'appareil ou l'imprimante a un problème." Margin="0">

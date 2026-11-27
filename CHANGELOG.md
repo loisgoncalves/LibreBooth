@@ -6,6 +6,20 @@ même. La version installée s'affiche dans l'admin › Système.
 Numéro majeure.fonction.correctif : **majeure** quand les habitudes ou les fichiers de l'utilisateur changent,
 **fonction** pour une nouveauté, **correctif** pour une correction (voir le README, « Numéros de version »).
 
+## 3.2.2 – 27/11/2026
+
+- **Après « Imprimer »** : dès que l'impression est lancée, « Merci ! » s'affiche, puis l'accueil revient au bout de
+  3 secondes pour la personne suivante (avant, la photo restait affichée jusqu'à « Terminer » ou 45 s sans toucher
+  l'écran). Si l'impression n'a pas pu partir, l'invité reste sur sa photo avec le message d'erreur. L'impression
+  automatique ne change pas : la photo reste affichée comme avant.
+- **Écran « Merci ! »** : 3 s par défaut au lieu de 6 (admin › Écrans › « Écran de fin »). Un PC resté à l'ancienne
+  valeur par défaut passe à 3 s, une seule fois ; une autre durée choisie dans l'admin est gardée.
+- **Compteur de papier à 0** : l'invité reste sur « Merci ! » le temps de répondre à « Votre photo est-elle sortie ? »
+  (ou une minute sans réponse), puis l'accueil revient.
+- **Petits écrans** : la fenêtre d'installation (et de désinstallation) ne dépasse plus de l'écran. Son contenu défile
+  avec une barre à droite, et les boutons « Installer » et « Annuler » restent toujours visibles. Les fenêtres de
+  LibreBooth plus grandes que l'écran, comme « Vérifier que tout fonctionne », sont aussi ramenées à sa taille.
+
 ## 3.2.1 – 26/11/2026
 
 - **Capacité du rouleau** : 400 tirages par défaut au lieu de 700. Un rouleau 15x20 de DS620 compte 200 feuilles,

@@ -29,7 +29,8 @@ propres impressions, ses propres écrans et son propre dossier de photos.
 - **Montage automatique** habillé pour l'événement : six thèmes (mariage, anniversaire, entreprise), textes, polices,
   couleurs, décor, ou vos **propres images** (fonds faits dans Canva ou Photoshop, logo).
 - **Écrans aux couleurs de l'événement**, avec une image d'accueil propre à chaque événement.
-- **Impression** sur la DNP : l'invité choisit ses exemplaires (jusqu'au maximum fixé pour l'événement).
+- **Impression** sur la DNP : l'invité choisit ses exemplaires (jusqu'au maximum fixé pour l'événement). Dès qu'il
+  appuie sur « Imprimer », « Merci ! » s'affiche 3 secondes, puis l'accueil pour la personne suivante.
 - **Recommencer** : l'invité refait sa série tant qu'il n'a rien imprimé ; la série refusée est gardée à part.
 - **Admin d'abord** : au lancement, le code PIN, le choix de l'événement, puis l'administration dans une fenêtre
   normale, en clair ou en sombre. Sa page d'accueil, **« Prêt pour l'événement ? »**, dit d'un coup d'œil ce qui reste

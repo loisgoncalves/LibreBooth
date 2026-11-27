@@ -34,6 +34,65 @@ internal static class FormParts
         }
     }
 
+    /// <summary>
+    /// Zone utile d'écran imposée pour les essais (/ecran LARGEURxHAUTEUR, avec /apercu ou /test) : simule un petit
+    /// écran sur un grand. Sinon, la zone utile de l'écran de la fenêtre (sans la barre des tâches).
+    /// </summary>
+    public static Size? ScreenForTests { get; set; }
+
+    /// <summary>
+    /// Contenu dans une zone qui défile, boutons en bas toujours visibles. La fenêtre prend la taille de son contenu
+    /// sans jamais dépasser l'écran : sur un petit écran (ou avec un texte agrandi dans Windows), elle s'arrête au bord
+    /// et une barre de défilement apparaît à droite.
+    /// </summary>
+    public static void Arrange(Form form, Control content, Control buttons)
+    {
+        form.AutoSize = false;
+        content.Dock = DockStyle.None;
+        content.Location = Point.Empty;
+        var scroller = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
+        scroller.Controls.Add(content);
+        buttons.Dock = DockStyle.Bottom;
+        // Ajoutés dans cet ordre, les boutons prennent le bas en premier, la zone qui défile remplit le reste.
+        form.Controls.Add(scroller);
+        form.Controls.Add(buttons);
+
+        var fitting = false;
+        void Fit(bool first)
+        {
+            if (fitting || form.IsDisposed || (!first && !form.IsHandleCreated)) return;
+            fitting = true;
+            try
+            {
+                var screen = Screen.FromControl(form).WorkingArea;
+                var area = ScreenForTests is { } test ? new Rectangle(screen.Location, test) : screen;
+                var frame = form.Size - form.ClientSize;
+                var maxClient = new Size(area.Width - frame.Width, area.Height - frame.Height);
+                var wanted = new Size(
+                    content.PreferredSize.Width + form.Padding.Horizontal,
+                    content.PreferredSize.Height + buttons.PreferredSize.Height + form.Padding.Vertical);
+                if (wanted.Height > maxClient.Height) wanted.Width += SystemInformation.VerticalScrollBarWidth;
+                form.ClientSize = new Size(Math.Min(wanted.Width, maxClient.Width), Math.Min(wanted.Height, maxClient.Height));
+
+                // Au centre de l'écran à l'ouverture, puis toujours entièrement visible quand le contenu grandit
+                // (sauf l'aperçu de /apercu, dessiné hors de l'écran).
+                if (form.StartPosition != FormStartPosition.CenterScreen) return;
+                var location = first
+                    ? new Point(area.Left + (area.Width - form.Width) / 2, area.Top + (area.Height - form.Height) / 2)
+                    : form.Location;
+                form.Location = new Point(
+                    Math.Max(area.Left, Math.Min(location.X, area.Right - form.Width)),
+                    Math.Max(area.Top, Math.Min(location.Y, area.Bottom - form.Height)));
+            }
+            finally
+            {
+                fitting = false;
+            }
+        }
+        form.Load += (_, _) => Fit(first: true);
+        content.SizeChanged += (_, _) => Fit(first: false);
+    }
+
     /// <summary>Le logo de LibreBooth, le titre et l'auteur.</summary>
     public static Control Header(string title)
     {

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
 using System.Windows.Media;
+using LibreBooth.Core.Admin;
 using LibreBooth.Core.Config;
 using LibreBooth.Core.Design;
 using Serilog;
@@ -80,6 +81,7 @@ internal static class AdminTheme
     /// </summary>
     public static void Attach(Window window)
     {
+        FitToScreen(window);
         window.SetResourceReference(Control.BackgroundProperty, "Admin.Window");
         window.SetResourceReference(Control.ForegroundProperty, "Admin.Text");
         AttachedWindows.RemoveAll(w => !w.TryGetTarget(out var target) || ReferenceEquals(target, window));
@@ -94,6 +96,17 @@ internal static class AdminTheme
             // Avant le premier affichage : la barre de titre naît directement dans la bonne couleur.
             window.SourceInitialized += (_, _) => ApplyTitleBar(window, repaint: false);
         }
+    }
+
+    /// <summary>Fenêtre plus grande que l'écran ramenée à sa zone utile (voir <see cref="WindowFit"/>).</summary>
+    private static void FitToScreen(Window window)
+    {
+        var area = SystemParameters.WorkArea;
+        var fitted = WindowFit.Fit(new WindowSize(window.Width, window.Height, window.MinWidth, window.MinHeight), area.Width, area.Height);
+        window.MinWidth = fitted.MinWidth;
+        window.MinHeight = fitted.MinHeight;
+        if (!double.IsNaN(fitted.Width)) window.Width = fitted.Width;
+        if (!double.IsNaN(fitted.Height)) window.Height = fitted.Height;
     }
 
     private static IEnumerable<Window> OpenWindows()

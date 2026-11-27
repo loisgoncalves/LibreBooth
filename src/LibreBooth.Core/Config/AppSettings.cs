@@ -42,10 +42,10 @@ public enum PaperReport
 public sealed class AppSettings
 {
     /// <summary>
-    /// Version du format de config.json. 2 depuis la 3.2.1 : un fichier en version 1 resté à l'ancienne capacité de
-    /// rouleau par défaut (700) passe à 400 (voir <see cref="Normalize"/>).
+    /// Version du format de config.json (voir <see cref="Normalize"/>) : 2 depuis la 3.2.1 (capacité du rouleau
+    /// restée à l'ancienne valeur par défaut, 700 → 400), 3 depuis la 3.2.2 (écran « Merci ! » resté à 6 s → 3 s).
     /// </summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public int Version { get; set; } = CurrentVersion;
     public string AdminPin { get; set; } = "1234";
@@ -81,11 +81,13 @@ public sealed class AppSettings
         Camera.CaptureTimeoutSeconds = Math.Clamp(Camera.CaptureTimeoutSeconds, 4, 60);
 
         Print.DriverSettings ??= new();
-        if (Version < 2)
+        if (Version < CurrentVersion)
         {
-            // Jusqu'à la 3.2.0, la capacité par défaut valait 700 tirages, bien plus qu'un rouleau 15x20 de DS620
-            // (200 feuilles, soit 400 tirages 10x15) : un config.json resté à cette valeur est corrigé une fois.
-            if (Print.MediaCapacity == PrintSettings.OldDefaultMediaCapacity) Print.MediaCapacity = PrintSettings.DefaultMediaCapacity;
+            // Anciennes valeurs par défaut, corrigées une fois (une valeur choisie dans l'admin est gardée).
+            // 3.2.1 : 700 tirages par rouleau, bien plus qu'un rouleau 15x20 de DS620 (200 feuilles, soit 400 tirages 10x15).
+            if (Version < 2 && Print.MediaCapacity == PrintSettings.OldDefaultMediaCapacity) Print.MediaCapacity = PrintSettings.DefaultMediaCapacity;
+            // 3.2.2 : « Merci ! » 6 s ; il suit désormais l'appui sur « Imprimer », 3 s suffisent pour passer à l'invité suivant.
+            if (Version < 3 && Screens.ThanksSeconds == ScreenSettings.OldDefaultThanksSeconds) Screens.ThanksSeconds = ScreenSettings.DefaultThanksSeconds;
             Version = CurrentVersion;
         }
         Print.AutoPrintCopies = Math.Clamp(Print.AutoPrintCopies, 1, 10);
@@ -182,7 +184,11 @@ public sealed class ScreenSettings
     public int PreviewMilliseconds { get; set; } = 1500;
     public int ChooseTimeoutSeconds { get; set; } = 30;
     public int ReviewTimeoutSeconds { get; set; } = 45;
-    public int ThanksSeconds { get; set; } = 6;
+    /// <summary>Écran « Merci ! », affiché dès que l'invité appuie sur « Imprimer » (ou « Terminer »), puis l'accueil.</summary>
+    public int ThanksSeconds { get; set; } = DefaultThanksSeconds;
+    public const int DefaultThanksSeconds = 3;
+    /// <summary>Durée de « Merci ! » par défaut jusqu'à la 3.2.1.</summary>
+    public const int OldDefaultThanksSeconds = 6;
     public int ErrorSeconds { get; set; } = 10;
     /// <summary>Pointeur de la souris caché tant qu'elle ne bouge pas (il réapparaît dès qu'on la bouge).</summary>
     public bool HideCursor { get; set; } = true;

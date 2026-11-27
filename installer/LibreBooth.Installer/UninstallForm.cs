@@ -51,7 +51,7 @@ internal sealed class UninstallForm : Form
         FormParts.Setup(this, "Désinstallation de LibreBooth");
         MinimizeBox = false;
 
-        var layout = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Dock = DockStyle.Fill };
+        var layout = new TableLayoutPanel { ColumnCount = 1, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
         layout.Controls.Add(FormParts.Header($"Désinstallation de LibreBooth {Installation.Version}"));
         layout.Controls.Add(FormParts.Paragraph(
             "LibreBooth va être retiré de ce PC : le programme, ses raccourcis et son inscription dans Windows. "
@@ -88,11 +88,10 @@ internal sealed class UninstallForm : Form
             MaximumSize = new Size(560, 0),
             Margin = new Padding(0, 16, 0, 0),
         });
-        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Right, Margin = new Padding(0, 16, 0, 0) };
+        var buttons = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(0, 16, 0, 0) };
         buttons.Controls.Add(_cancelButton);
         buttons.Controls.Add(_uninstallButton);
-        layout.Controls.Add(buttons);
-        Controls.Add(layout);
+        FormParts.Arrange(this, layout, buttons);
 
         CancelButton = _cancelButton;
         _appDataCheck.CheckedChanged += (_, _) =>

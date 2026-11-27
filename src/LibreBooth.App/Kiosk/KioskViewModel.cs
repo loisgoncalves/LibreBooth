@@ -265,12 +265,20 @@ public sealed partial class KioskViewModel : ObservableObject
                 break;
         }
 
-        var timeout = SessionStateMachine.TimeoutFor(e.Current, screens);
-        if (timeout != null && !_paused)
-        {
-            _inactivityTimer.Interval = timeout.Value;
-            _inactivityTimer.Start();
-        }
+        StartScreenTimeout(e.Current);
+    }
+
+    /// <summary>
+    /// Délai d'inactivité de l'écran. Sur « Merci ! », il attend la fin de la question sur le papier (compteur à 0) :
+    /// l'invité reste devant l'écran pour répondre, au lieu de laisser la place au suivant (depuis la 3.2.2).
+    /// </summary>
+    private void StartScreenTimeout(KioskState state)
+    {
+        var timeout = SessionStateMachine.TimeoutFor(state, _services.Settings.Screens);
+        if (timeout == null || _paused) return;
+        if (state == KioskState.Thanks && _paperStep != PaperStep.None) return;
+        _inactivityTimer.Interval = timeout.Value;
+        _inactivityTimer.Start();
     }
 
     // ---------------------------------------------------------------- Début de session
@@ -579,12 +587,25 @@ public sealed partial class KioskViewModel : ObservableObject
 
     // ---------------------------------------------------------------- Impression
 
-    public async Task PrintCurrentAsync(int copies)
+    /// <summary>
+    /// Bouton « Imprimer » de l'invité : dès que l'impression est lancée, « Merci ! » puis l'accueil, pour passer à la
+    /// personne suivante (depuis la 3.2.2). En cas d'échec, l'invité reste sur sa photo avec le message d'erreur.
+    /// L'impression automatique, elle, laisse la photo affichée comme avant.
+    /// </summary>
+    public async Task PrintFromReviewAsync(int copies)
     {
         var session = _session;
-        if (session?.CompositePath == null || Review.IsPrinting) return;
+        if (!await PrintCurrentAsync(copies)) return;
+        if (_session == session && !_paused) _machine.Finish();
+    }
+
+    /// <returns>true si l'impression est partie.</returns>
+    public async Task<bool> PrintCurrentAsync(int copies)
+    {
+        var session = _session;
+        if (session?.CompositePath == null || Review.IsPrinting) return false;
         UpdateReviewPrintState();
-        if (!Review.CanPrint) return;
+        if (!Review.CanPrint) return false;
 
         copies = Math.Clamp(copies, 1, Review.MaxCopies);
         // Compteur de papier avant l'impression : à 0, elle part quand même, puis on demande à l'invité si elle est sortie.
@@ -606,11 +627,13 @@ public sealed partial class KioskViewModel : ObservableObject
             {
                 StartPaperCheck(new PaperPrint(session, session.CompositePath, session.Template.Layout.PrintProfile, copies));
             }
+            return true;
         }
         catch (Exception ex)
         {
             _log.Error(ex, "Impression impossible");
             Review.StatusMessage = "L'impression n'a pas pu être lancée. Prévenez l'animateur.";
+            return false;
         }
         finally
         {
@@ -760,6 +783,8 @@ public sealed partial class KioskViewModel : ObservableObject
         PaperQuestion.ShowAnswers = false;
         PaperQuestion.ShowOk = false;
         PaperQuestion.IsBusy = false;
+        // L'invité gardé sur « Merci ! » le temps de la question : le retour à l'accueil reprend.
+        if (_machine.State == KioskState.Thanks && !_inactivityTimer.IsEnabled) StartScreenTimeout(KioskState.Thanks);
     }
 
     /// <summary>Question abandonnée sans réponse : rien ne change, elle sera posée à la prochaine impression.</summary>

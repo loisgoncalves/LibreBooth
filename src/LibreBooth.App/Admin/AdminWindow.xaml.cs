@@ -75,10 +75,7 @@ public partial class AdminWindow : Window
         HeaderVersionText.Text = $"Version {App.Version}";
         RetakeCombo.ItemsSource = Enumerable.Range(0, ScreenSettings.MaxRetakes + 1).ToList();
 
-        // Fenêtre normale (pas de plein écran), à la taille de l'écran s'il est plus petit.
-        var area = SystemParameters.WorkArea;
-        Width = Math.Min(Width, Math.Max(MinWidth, area.Width - 40));
-        Height = Math.Min(Height, Math.Max(MinHeight, area.Height - 40));
+        // Fenêtre normale (pas de plein écran), ramenée à la taille de l'écran s'il est plus petit : AdminTheme.Attach.
 
         // Les listes sont remplies AVANT de brancher les réglages, pour que les sélections soient bien reprises.
         ProfilesList.ItemsSource = _profiles;
